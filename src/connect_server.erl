@@ -71,7 +71,7 @@ create_dbase_info(ClusterSpec,InstanceId)->
     gen_server:call(?MODULE,{create_dbase_info,ClusterSpec,InstanceId},infinity).
 
 create_connect_nodes(ClusterSpec,InstanceId)->
-    gen_server:call(?MODULE,{create_connect_info,ClusterSpec,InstanceId},infinity).
+    gen_server:call(?MODULE,{create_connect_nodes,ClusterSpec,InstanceId},infinity).
 
 ping() ->
     gen_server:call(?MODULE, {ping}).
@@ -288,7 +288,7 @@ connect_nodes(ClusterSpec,InstanceId)->
     MissingConnectNodes=[Node||Node<-NodesToConnect, 
 			       pang=:=net_adm:ping(Node)],
     [create_connect_node(InstanceId,ClusterSpec,PodNode,NodesToConnect)||PodNode<-MissingConnectNodes].
-
+    
 create_connect_node(InstanceId,ClusterSpec,PodNode,NodesToConnect)->
     io:format("INFO: create new/restart connect_node  ~p~n",[{date(),time()}]), 
     io:format("INFO: Cluster and PodNode   ~p~n",[{ClusterSpec,PodNode}]),  
@@ -301,7 +301,7 @@ create_connect_node(InstanceId,ClusterSpec,PodNode,NodesToConnect)->
     {ok,PodDir}=db_cluster_instance:read(pod_dir,InstanceId,PodNode),
     PaArgs=" -detached ",
     EnvArgs=" ",
-    ops_vm:ssh_create(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,NodesToConnect,?TimeOut). 
+    ops_vm:ssh_create(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,NodesToConnect,?TimeOut).
 
 %% --------------------------------------------------------------------
 %% Function: terminate/2

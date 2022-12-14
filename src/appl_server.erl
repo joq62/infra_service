@@ -88,7 +88,7 @@ initiate(InstanceId)->
 %% --------------------------------------------------------------------
 init([]) -> 
 
-    ok=db_appl_instance:create_table(),
+    
     io:format("Started Server ~p~n",[{?MODULE,?LINE}]),
 
     {ok, #state{
@@ -277,6 +277,7 @@ appl_new(ApplSpec,HostSpec,_ClusterSpec,InstanceId)->
 %% --------------------------------------------------------------------
 deploy(ClusterSpec,InstanceId)->
     ApplDeploySpecList=db_appl_deployment:read_all(),
+    io:format(" ApplDeploySpecList ~p~n",[{ApplDeploySpecList,?MODULE,?LINE}]),
     start_appl(ApplDeploySpecList,ClusterSpec,InstanceId).
 
 % Affinity: any_host,[HostSpec,,,HostSpecN]
@@ -299,7 +300,8 @@ deploy(ClusterSpec,InstanceId)->
 % }.
 start_appl([],_ClusterSpec,_InstanceId)->
     ok;
-start_appl([{_Id,ApplSpec,ClusterSpec,NumInstances,Affinity}|T],CurrentClusterSpec,InstanceId)->
+          
+start_appl([{_Id,ApplSpec,_Vsn,ClusterSpec,NumInstances,Affinity}|T],CurrentClusterSpec,InstanceId)->
     case (CurrentClusterSpec == ClusterSpec) of
 	false->
 	    false;

@@ -22,6 +22,8 @@
 	 create_controller_pods/2, 
 	 create_worker_pods/2,
 	 get_pod/2,
+	 present_controller_nodes/0,
+	 present_worker_nodes/0,
 	 
 	 ping/0
 	]).
@@ -65,13 +67,21 @@ start()-> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 stop()-> gen_server:call(?MODULE, {stop},infinity).
 
 create_controller_pods(ClusterSpec,InstanceId)->
-    controller_pods(ClusterSpec,InstanceId).
+    gen_server:call(?MODULE, {create_controller_pods,ClusterSpec,InstanceId},infinity).
+ %    controller_pods(ClusterSpec,InstanceId).
 
 create_worker_pods(ClusterSpec,InstanceId)->
-    worker_pods(ClusterSpec,InstanceId).
+    gen_server:call(?MODULE, {create_worker_pods,ClusterSpec,InstanceId},infinity).
+%    worker_pods(ClusterSpec,InstanceId).
 
 get_pod(ApplSpec,HostSpec)->
       gen_server:call(?MODULE, {get_pod,ApplSpec,HostSpec},infinity).
+
+present_controller_nodes()->
+    gen_server:call(?MODULE, {present_controllers},infinity).
+present_worker_nodes()->
+    gen_server:call(?MODULE, {present_workers},infinity).
+
 
 ping() ->
     gen_server:call(?MODULE, {ping}).
@@ -115,6 +125,27 @@ init([]) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
+
+handle_call({create_controller_pods,ClusterSpec,InstanceId},_From, State) ->
+    controller_pods(ClusterSpec,InstanceId) ,
+    PresentControllerNodes=present_controller_nodes(InstanceId),
+    MissingControllerNodes=missing_controller_nodes(InstanceId),
+    NewState=State#state{present_controller_nodes=PresentControllerNodes,
+			 missing_controller_nodes=MissingControllerNodes		    
+			},
+    Reply={PresentControllerNodes,MissingControllerNodes},
+    {reply, Reply, NewState};
+
+handle_call({create_worker_pods,ClusterSpec,InstanceId},_From, State) ->
+    worker_pods(ClusterSpec,InstanceId) ,
+    PresentWorkerNodes=present_worker_nodes(InstanceId),
+    MissingWorkerNodes=missing_worker_nodes(InstanceId),
+    NewState=State#state{present_worker_nodes=PresentWorkerNodes,
+			 missing_worker_nodes=MissingWorkerNodes		    
+			},
+    Reply={PresentWorkerNodes,MissingWorkerNodes},
+    {reply, Reply, NewState};
+
 handle_call({get_pod,ApplSpec,HostSpec},_From, State) ->
     % Candidates
     Reply=case db_host_spec:read(hostname,HostSpec) of 
@@ -139,6 +170,14 @@ handle_call({get_pod,ApplSpec,HostSpec},_From, State) ->
 			  end
 		  end
 	  end,
+    {reply, Reply, State};
+
+
+handle_call({present_controllers},_From, State) ->
+    Reply=State#state.present_controller_nodes,
+    {reply, Reply, State};
+handle_call({present_workers},_From, State) ->
+    Reply=State#state.present_worker_nodes,
     {reply, Reply, State};
 
 handle_call({ping},_From, State) ->
