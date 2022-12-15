@@ -6,7 +6,11 @@
               {applications,[kernel,stdlib]},
               {env,[]},
               {modules,[appl_server,connect_server,controller,controller_app,
-                        controller_server,controller_sup,oam,oam_server,
-                        ops_ssh,ops_vm,pod_server]},
+                        controller_server,controller_sup,db_appl_deployment,
+                        db_appl_instance,db_appl_spec,db_appl_state,
+                        db_cluster_application_deployment,db_cluster_instance,
+                        db_cluster_spec,db_etcd,db_etcd_server,db_host_spec,
+                        db_pod_info,lib_db_etcd,oam,oam_server,ops_ssh,ops_vm,
+                        pod_server]},
               {licenses,["Apache 2.0"]},
               {links,[]}]}.

@@ -23,6 +23,8 @@
 	 deploy_appls/2,
 	 new/4,
 	 delete/4,
+	 present_apps/1,
+	 missing_apps/1,
 	 
 	 initiate/1,
 	 heartbeat/0,
@@ -66,8 +68,15 @@ delete(ApplSpec,PodNode,ClusterSpec,InstanceId)->
 deploy_appls(ClusterSpec,InstanceId)->
     gen_server:call(?MODULE, {deploy_appls,ClusterSpec,InstanceId},infinity).
 
+present_apps(InstanceId) ->
+    gen_server:call(?MODULE, {present_apps,InstanceId}).
+
+missing_apps(InstanceId) ->
+    gen_server:call(?MODULE, {missing_apps,InstanceId}).
+
 ping() ->
     gen_server:call(?MODULE, {ping}).
+
 %% cast
 heartbeat()-> 
     gen_server:cast(?MODULE, {heartbeat}).
@@ -116,6 +125,17 @@ handle_call({delete,ApplSpec,PodNode,ClusterSpec,InstanceId},_From, State) ->
 handle_call({deploy_appls,ClusterSpec,InstanceId},_From, State) ->
     Reply=deploy(ClusterSpec,InstanceId),
       {reply, Reply, State};
+
+
+
+
+handle_call({present_apps,InstanceId},_From, State) ->
+    Reply=present(InstanceId),
+    {reply, Reply, State};
+
+handle_call({missing_apps,InstanceId},_From, State) ->
+    Reply=missing(InstanceId),
+    {reply, Reply, State};
 
 handle_call({initiate,InstanceId},_From, State) ->
 
@@ -264,12 +284,15 @@ appl_new(ApplSpec,HostSpec,_ClusterSpec,InstanceId)->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-%missing_worker_nodes(InstanceId)->
- %   [Node||Node<-db_cluster_instance:nodes(worker,InstanceId), 
-%	   pang=:=net_adm:ping(Node)].
-%present_worker_nodes(InstanceId)->
-  %  [Node||Node<-db_cluster_instance:nodes(worker,InstanceId), 
-%	   pong=:=net_adm:ping(Node)].
+present(InstanceId)->
+    AppPodList=[{db_appl_spec:read(app,AppSpec),PodNode,AppSpec}||{AppSpec,PodNode}<-db_appl_instance:get_pod_appl_specs(InstanceId)],
+    [{AppSpec,PodNode}||{{ok,App},PodNode,AppSpec}<-AppPodList, 
+			 pong==rpc:call(PodNode,App,ping,[],2000)].
+missing(InstanceId)->
+    AppPodList=[{db_appl_spec:read(app,AppSpec),PodNode,AppSpec}||{AppSpec,PodNode}<-db_appl_instance:get_pod_appl_specs(InstanceId)],
+    [{AppSpec,PodNode}||{{ok,App},PodNode,AppSpec}<-AppPodList, 
+			 pong/=rpc:call(PodNode,App,ping,[],2000)].
+
 %% --------------------------------------------------------------------
 %% Function: terminate/2
 %% Description: Shutdown the server

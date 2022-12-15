@@ -54,6 +54,11 @@ deploy_appls_test()->
   %  io:format("HereIsIt ~p~n",[{HereIsIt,?MODULE,?FUNCTION_NAME}]),
     [PodNode|_]=HereIsIt,
     {ok,42}=oam_server:call(ClusterSpec,PodNode,test_add,add,[20,22],2000),
+
+    {ok,PresentApps}=oam_server:present_apps(ClusterSpec),
+    io:format("PresentApps ~p~n",[{PresentApps,?MODULE,?FUNCTION_NAME}]),
+    {ok,MissingApps}=oam_server:missing_apps(ClusterSpec),
+    io:format("MissingApps ~p~n",[{MissingApps,?MODULE,?FUNCTION_NAME}]),
     
     
     

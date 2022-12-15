@@ -1,0 +1,114 @@
+-module(db_appl_instance).
+-import(lists, [foreach/2]).
+-compile(export_all).
+
+-include_lib("stdlib/include/qlc.hrl").
+-include("db_appl_instance.hrl").
+
+create_table()->
+    mnesia:create_table(?TABLE, [{attributes, record_info(fields, ?RECORD)}
+				]),
+    mnesia:wait_for_tables([?TABLE], 20000).
+
+create_table(NodeList,StorageType)->
+    mnesia:create_table(?TABLE, [{attributes, record_info(fields, ?RECORD)},
+				 {StorageType,NodeList}]),
+    mnesia:wait_for_tables([?TABLE], 20000).
+
+add_node(Node,StorageType)->
+    Result=case mnesia:change_config(extra_db_nodes, [Node]) of
+	       {ok,[Node]}->
+		   mnesia:add_table_copy(schema, node(),StorageType),
+		   mnesia:add_table_copy(?TABLE, node(), StorageType),
+		   Tables=mnesia:system_info(tables),
+		   mnesia:wait_for_tables(Tables,20*1000);
+	       Reason ->
+		   Reason
+	   end,
+    Result.
+
+create(SpecId,ClusterDeployment,ApplSpec,Vsn,NumInstances,Affinity)->
+    Record=#?RECORD{
+		    spec_id=SpecId,
+		    cluster_deployment=ClusterDeployment,
+		    appl_spec=ApplSpec,
+		    vsn=Vsn,
+		    num_instances=NumInstances,
+		    affinity=Affinity
+		   },
+    F = fun() -> mnesia:write(Record) end,
+    mnesia:transaction(F).
+
+member(SpecId)->
+    Z=do(qlc:q([X || X <- mnesia:table(?TABLE),		
+		     X#?RECORD.spec_id==SpecId])),
+    Member=case Z of
+	       []->
+		   false;
+	       _->
+		   true
+	   end,
+    Member.
+
+read(Key,SpecId)->
+    Return=case read(SpecId) of
+	       []->
+		   {error,[eexist,SpecId,?MODULE,?LINE]};
+	       {_SpecId,ClusterDeployment,ApplSpec,Vsn,NumInstances,Affinity} ->
+		   case  Key of
+		       cluster_deployment->
+			   {ok,ClusterDeployment};
+		        appl_spec->
+			   {ok,ApplSpec};
+		       vsn->
+			   {ok,Vsn};
+		       num_instances->
+			   {ok,NumInstances};
+		       affinity->
+			   {ok,Affinity};
+		       Err ->
+			   {error,['Key eexists',Err,SpecId,?MODULE,?LINE]}
+		   end
+	   end,
+    Return.
+
+
+get_all_id()->
+    Z=do(qlc:q([X || X <- mnesia:table(?TABLE)])),
+    [SpecId||{?RECORD,SpecId,_ApplSpec,_Vsn,_NumInstances,_Affinity}<-Z].
+    
+read_all() ->
+    Z=do(qlc:q([X || X <- mnesia:table(?TABLE)])),
+    [{SpecId,ClusterDeployment,ApplSpec,Vsn,NumInstances,Affinity}||{?RECORD,SpecId,ClusterDeployment,ApplSpec,Vsn,NumInstances,Affinity}<-Z].
+
+read(Object)->
+    Z=do(qlc:q([X || X <- mnesia:table(?TABLE),		
+		     X#?RECORD.spec_id==Object])),
+    Result=case Z of
+	       []->
+		  [];
+	       _->
+		   [Info]=[{SpecId,ClusterDeployment,ApplSpec,Vsn,NumInstances,Affinity}||{?RECORD,SpecId,ClusterDeployment,ApplSpec,Vsn,NumInstances,Affinity}<-Z],
+		   Info
+	   end,
+    Result.
+
+delete(Object) ->
+    F = fun() -> 
+		mnesia:delete({?TABLE,Object})
+		    
+	end,
+    mnesia:transaction(F).
+
+
+do(Q) ->
+    F = fun() -> qlc:e(Q) end,
+    Result=case mnesia:transaction(F) of
+	       {atomic, Val} ->
+		   Val;
+	       {error,Reason}->
+		   {error,Reason}
+	   end,
+    Result.
+
+%%-------------------------------------------------------------------------

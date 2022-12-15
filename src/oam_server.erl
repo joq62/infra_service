@@ -43,6 +43,8 @@
 %debug
 -export([
 	 all_apps/1,
+	 present_apps/1,
+	 missing_apps/1,
 	 call/6,
 	 where_is_app/2
 	]).
@@ -105,6 +107,13 @@ is_cluster_deployed(ClusterSpec)->
 
 all_apps(ClusterSpec)->
     gen_server:call(?MODULE, {all_apps,ClusterSpec},infinity).
+
+present_apps(ClusterSpec) ->
+    gen_server:call(?MODULE, {present_apps,ClusterSpec}).
+
+missing_apps(ClusterSpec) ->
+    gen_server:call(?MODULE, {missing_apps,ClusterSpec}).
+
 where_is_app(ClusterSpec,App)->
     gen_server:call(?MODULE, {where_is_app,ClusterSpec,App},infinity).
 call(ClusterSpec,PodNode,M,F,A,T)->
@@ -322,6 +331,25 @@ handle_call({where_is_app,ClusterSpec,App},_From, State) ->
 	    end,
     {reply, Reply, State};
 
+handle_call({present_apps,ClusterSpec},_From, State) ->
+    Reply= case lists:keyfind(ClusterSpec,1,State#state.cluster_specs) of
+	       false->
+		   {error,[eexists,ClusterSpec,?MODULE,?LINE]};
+	       {ClusterSpec,InstanceId}->
+		   PresentApps=appl_server:present_apps(InstanceId),
+		   {ok,PresentApps}
+	    end,
+    {reply, Reply, State};
+
+handle_call({missing_apps,ClusterSpec},_From, State) ->
+    Reply= case lists:keyfind(ClusterSpec,1,State#state.cluster_specs) of
+	       false->
+		   {error,[eexists,ClusterSpec,?MODULE,?LINE]};
+	       {ClusterSpec,InstanceId}->
+		   PresentApps=appl_server:missing_apps(InstanceId),
+		   {ok,PresentApps}
+	    end,
+    {reply, Reply, State};
 
 handle_call({call,ClusterSpec,PodNode,M,F,A,T},_From, State) ->
     Reply= case lists:keyfind(ClusterSpec,1,State#state.cluster_specs) of
