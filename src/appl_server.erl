@@ -20,9 +20,9 @@
 
 %% External exports
 -export([
-	 deploy_appls/2,
-	 new/4,
-	 delete/4,
+	 deploy_appls/1,
+	 new/3,
+	 delete/3,
 	 present_apps/1,
 	 missing_apps/1,
 	 
@@ -46,7 +46,7 @@
 
 %%-------------------------------------------------------------------
 -record(state,{
-	       instance_id
+	      cluster_spec
 	      }).
 
 
@@ -59,20 +59,20 @@
 start()-> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 stop()-> gen_server:call(?MODULE, {stop},infinity).
 
-new(ApplSpec,HostSpec,ClusterSpec,InstanceId)->
-    gen_server:call(?MODULE, {new,ApplSpec,HostSpec,ClusterSpec,InstanceId},infinity).
+new(ApplSpec,HostSpec,ClusterSpec)->
+    gen_server:call(?MODULE, {new,ApplSpec,HostSpec,ClusterSpec},infinity).
 
-delete(ApplSpec,PodNode,ClusterSpec,InstanceId)->
-    gen_server:call(?MODULE, {delete,ApplSpec,PodNode,ClusterSpec,InstanceId},infinity).
+delete(ApplSpec,PodNode,ClusterSpec)->
+    gen_server:call(?MODULE, {delete,ApplSpec,PodNode,ClusterSpec},infinity).
 
-deploy_appls(ClusterSpec,InstanceId)->
-    gen_server:call(?MODULE, {deploy_appls,ClusterSpec,InstanceId},infinity).
+deploy_appls(ClusterSpec)->
+    gen_server:call(?MODULE, {deploy_appls,ClusterSpec},infinity).
 
-present_apps(InstanceId) ->
-    gen_server:call(?MODULE, {present_apps,InstanceId}).
+present_apps(ClusterSpec) ->
+    gen_server:call(?MODULE, {present_apps,ClusterSpec}).
 
-missing_apps(InstanceId) ->
-    gen_server:call(?MODULE, {missing_apps,InstanceId}).
+missing_apps(ClusterSpec) ->
+    gen_server:call(?MODULE, {missing_apps,ClusterSpec}).
 
 ping() ->
     gen_server:call(?MODULE, {ping}).
@@ -101,7 +101,7 @@ init([]) ->
     io:format("Started Server ~p~n",[{?MODULE,?LINE}]),
 
     {ok, #state{
-	        instance_id=undefined}}.   
+	        cluster_spec=undefined}}.   
  
 
 %% --------------------------------------------------------------------
@@ -114,33 +114,33 @@ init([]) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
-handle_call({new,ApplSpec,HostSpec,ClusterSpec,InstanceId},_From, State) ->
-    Reply=appl_new(ApplSpec,HostSpec,ClusterSpec,InstanceId),
+handle_call({new,ApplSpec,HostSpec,ClusterSpec},_From, State) ->
+    Reply=appl_new(ApplSpec,HostSpec,ClusterSpec),
     {reply, Reply, State};
 
-handle_call({delete,ApplSpec,PodNode,ClusterSpec,InstanceId},_From, State) ->
-    Reply=appl_del(ApplSpec,PodNode,ClusterSpec,InstanceId),
+handle_call({delete,ApplSpec,PodNode,ClusterSpec},_From, State) ->
+    Reply=appl_del(ApplSpec,PodNode,ClusterSpec),
     {reply, Reply, State};
 
-handle_call({deploy_appls,ClusterSpec,InstanceId},_From, State) ->
-    Reply=deploy(ClusterSpec,InstanceId),
+handle_call({deploy_appls,ClusterSpec},_From, State) ->
+    Reply=deploy(ClusterSpec),
       {reply, Reply, State};
 
 
 
 
-handle_call({present_apps,InstanceId},_From, State) ->
-    Reply=present(InstanceId),
+handle_call({present_apps,ClusterSpec},_From, State) ->
+    Reply=present(ClusterSpec),
     {reply, Reply, State};
 
-handle_call({missing_apps,InstanceId},_From, State) ->
-    Reply=missing(InstanceId),
+handle_call({missing_apps,ClusterSpec},_From, State) ->
+    Reply=missing(ClusterSpec),
     {reply, Reply, State};
 
-handle_call({initiate,InstanceId},_From, State) ->
+handle_call({initiate,ClusterSpec},_From, State) ->
 
     Reply=ok,
-    {reply, Reply, State#state{instance_id=InstanceId}};
+    {reply, Reply, State#state{cluster_spec=ClusterSpec}};
 
 handle_call({ping},_From, State) ->
     Reply=pong,
@@ -201,8 +201,8 @@ code_change(_OldVsn, State, _Extra) ->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-appl_del(ApplSpec,PodNode,_ClusterSpec,InstanceId)->
-    Result=case rd:rpc_call(db_etcd,db_cluster_instance,read,[pod_dir,InstanceId,PodNode],5000) of
+appl_del(ApplSpec,PodNode,ClusterSpec)->
+    Result=case rd:rpc_call(db_etcd,db_cluster_instance,read,[pod_dir,ClusterSpec,PodNode],5000) of
 		    {error,Reason}->
 			{error,Reason};
 		    {ok,PodDir}->
@@ -226,7 +226,7 @@ appl_del(ApplSpec,PodNode,_ClusterSpec,InstanceId)->
 						   [rpc:call(PodNode,rd,delete_local_resource,[LocalType,PodNode],5000)||LocalType<-LocalTypeList],
 						   rpc:call(PodNode,rd,trade_resources,[],5000),
 						   timer:sleep(2000),
-						   case rd:rpc_call(db_etcd,db_appl_instance,delete,[InstanceId,ApplSpec,PodNode],5000) of
+						   case rd:rpc_call(db_etcd,db_appl_instance,delete,[ClusterSpec,ApplSpec,PodNode],5000) of
 						       {atomic,ok}->
 							   ok;
 						       Reason ->
@@ -243,14 +243,14 @@ appl_del(ApplSpec,PodNode,_ClusterSpec,InstanceId)->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-appl_new(ApplSpec,HostSpec,_ClusterSpec,InstanceId)->
+appl_new(ApplSpec,HostSpec,ClusterSpec)->
     Result=case pod_server:get_pod(ApplSpec,HostSpec) of
 	       {error,Reason}->
 		   {error,Reason};
 	       []->
 		   {error,[no_pods_available,?MODULE,?LINE]};
 	       {ok,PodNode}->
-		   {ok,PodDir}=db_cluster_instance:read(pod_dir,InstanceId,PodNode),
+		   {ok,PodDir}=db_cluster_instance:read(pod_dir,ClusterSpec,PodNode),
 		   {ok,PodApplGitPath}=db_appl_spec:read(gitpath,ApplSpec),
 		   ApplDir=filename:join([PodDir,ApplSpec]),
 	    
@@ -269,7 +269,7 @@ appl_new(ApplSpec,HostSpec,_ClusterSpec,InstanceId)->
 		   [rpc:call(PodNode,rd,add_target_resource_type,[TargetType],5000)||TargetType<-TargetTypeList],
 		   rpc:call(PodNode,rd,trade_resources,[],5000),
 		   timer:sleep(2000),
-		   {atomic,ok}=db_appl_instance:create(InstanceId,ApplSpec,PodNode,HostSpec,{date(),time()}),
+		   {atomic,ok}=db_appl_instance:create(ClusterSpec,ApplSpec,PodNode,HostSpec,{date(),time()}),
 		   {ok,PodNode}
 	   end,
     Result.
@@ -284,12 +284,12 @@ appl_new(ApplSpec,HostSpec,_ClusterSpec,InstanceId)->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-present(InstanceId)->
-    AppPodList=[{db_appl_spec:read(app,AppSpec),PodNode,AppSpec}||{AppSpec,PodNode}<-db_appl_instance:get_pod_appl_specs(InstanceId)],
+present(ClusterSpec)->
+    AppPodList=[{db_appl_spec:read(app,AppSpec),PodNode,AppSpec}||{AppSpec,PodNode}<-db_appl_instance:get_pod_appl_specs(ClusterSpec)],
     [{AppSpec,PodNode}||{{ok,App},PodNode,AppSpec}<-AppPodList, 
 			 pong==rpc:call(PodNode,App,ping,[],2000)].
-missing(InstanceId)->
-    AppPodList=[{db_appl_spec:read(app,AppSpec),PodNode,AppSpec}||{AppSpec,PodNode}<-db_appl_instance:get_pod_appl_specs(InstanceId)],
+missing(ClusterSpec)->
+    AppPodList=[{db_appl_spec:read(app,AppSpec),PodNode,AppSpec}||{AppSpec,PodNode}<-db_appl_instance:get_pod_appl_specs(ClusterSpec)],
     [{AppSpec,PodNode}||{{ok,App},PodNode,AppSpec}<-AppPodList, 
 			 pong/=rpc:call(PodNode,App,ping,[],2000)].
 
@@ -298,10 +298,10 @@ missing(InstanceId)->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-deploy(ClusterSpec,InstanceId)->
+deploy(ClusterSpec)->
     ApplDeploySpecList=db_appl_deployment:read_all(),
     io:format(" ApplDeploySpecList ~p~n",[{ApplDeploySpecList,?MODULE,?LINE}]),
-    start_appl(ApplDeploySpecList,ClusterSpec,InstanceId).
+    start_appl(ApplDeploySpecList,ClusterSpec).
 
 % Affinity: any_host,[HostSpec,,,HostSpecN]
 % db_appl_deployment:create(SpecId,ApplSpec,Vsn,ClusterSpec,NumInstances,Affinity)
@@ -321,28 +321,28 @@ deploy(ClusterSpec,InstanceId)->
 %  {affinity,any_host}	
 % ]
 % }.
-start_appl([],_ClusterSpec,_InstanceId)->
+start_appl([],_ClusterSpec)->
     ok;
           
-start_appl([{_Id,ApplSpec,_Vsn,ClusterSpec,NumInstances,Affinity}|T],CurrentClusterSpec,InstanceId)->
+start_appl([{_Id,ApplSpec,_Vsn,ClusterSpec,NumInstances,Affinity}|T],CurrentClusterSpec)->
     case (CurrentClusterSpec == ClusterSpec) of
 	false->
 	    false;
 	true->
 	    {ok,WorkerHostSpecs}=db_cluster_spec:read(worker_host_specs,ClusterSpec),
-	    start_appl(ApplSpec,ClusterSpec,NumInstances,Affinity,WorkerHostSpecs,InstanceId)
+	    start_appl(ApplSpec,ClusterSpec,NumInstances,Affinity,WorkerHostSpecs)
     end,
-    start_appl(T,ClusterSpec,InstanceId).
+    start_appl(T,ClusterSpec).
 
-start_appl(_ApplSpec,_ClusterSpec,0,_Affinity,_WorkerHostSpecs,_InstanceId)->
+start_appl(_ApplSpec,_ClusterSpec,0,_Affinity,_WorkerHostSpecs)->
     ok;
-start_appl(ApplSpec,ClusterSpec,N,any_host,[HostSpec|T],InstanceId)->
-    _R=appl_new(ApplSpec,HostSpec,ClusterSpec,InstanceId),
+start_appl(ApplSpec,ClusterSpec,N,any_host,[HostSpec|T])->
+    _R=appl_new(ApplSpec,HostSpec,ClusterSpec),
     RotatedHostSpecList=lists:append(T,[HostSpec]),
-    start_appl(ApplSpec,ClusterSpec,N-1,any_host,RotatedHostSpecList,InstanceId);
-start_appl(ApplSpec,ClusterSpec,N,[HostSpec|T],WorkerHostSpecs,InstanceId)->
-    _R=appl_new(ApplSpec,HostSpec,ClusterSpec,InstanceId),
+    start_appl(ApplSpec,ClusterSpec,N-1,any_host,RotatedHostSpecList);
+start_appl(ApplSpec,ClusterSpec,N,[HostSpec|T],WorkerHostSpecs)->
+    _R=appl_new(ApplSpec,HostSpec,ClusterSpec),
     RotatedHostSpecList=lists:append(T,[HostSpec]),
-    start_appl(ApplSpec,ClusterSpec,N-1,RotatedHostSpecList,WorkerHostSpecs,InstanceId).
+    start_appl(ApplSpec,ClusterSpec,N-1,RotatedHostSpecList,WorkerHostSpecs).
 
 	    

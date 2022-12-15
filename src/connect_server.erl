@@ -22,14 +22,14 @@
 
 %% External exports
 -export([
-	 create_dbase_info/2,
-	 create_connect_nodes/2
+	 create_dbase_info/1,
+	 create_connect_nodes/1
 	]).
 
 
 -export([
-	 start_monitoring/2,
-	 wanted_state/2,
+	 start_monitoring/1,
+	 wanted_state/1,
 	 heartbeat/0
 	]).
 -export([
@@ -52,7 +52,6 @@
 %%-------------------------------------------------------------------
 -record(state,{
 	       cluster_spec,
-	       instance_id,
 	       present_connect_nodes,
 	       missing_connect_nodes
 	      }).
@@ -67,17 +66,17 @@
 start()-> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 stop()-> gen_server:call(?MODULE, {stop},infinity).
 
-create_dbase_info(ClusterSpec,InstanceId)->
-    gen_server:call(?MODULE,{create_dbase_info,ClusterSpec,InstanceId},infinity).
+create_dbase_info(ClusterSpec)->
+    gen_server:call(?MODULE,{create_dbase_info,ClusterSpec},infinity).
 
-create_connect_nodes(ClusterSpec,InstanceId)->
-    gen_server:call(?MODULE,{create_connect_nodes,ClusterSpec,InstanceId},infinity).
+create_connect_nodes(ClusterSpec)->
+    gen_server:call(?MODULE,{create_connect_nodes,ClusterSpec},infinity).
 
 ping() ->
     gen_server:call(?MODULE, {ping}).
 %% cast
-start_monitoring(ClusterSpec,InstanceId)->
-    gen_server:cast(?MODULE, {start_monitoring,ClusterSpec,InstanceId}).
+start_monitoring(ClusterSpec)->
+    gen_server:cast(?MODULE, {start_monitoring,ClusterSpec}).
 
 heartbeat()-> 
     gen_server:cast(?MODULE, {heartbeat}).
@@ -98,7 +97,6 @@ init([]) ->
     io:format("Started Server ~p~n",[{?MODULE,?LINE}]),
 
     {ok, #state{cluster_spec=undefined,
-		instance_id=undefined,
 		missing_connect_nodes=undefined,
 		present_connect_nodes=undefined}}.   
  
@@ -113,12 +111,12 @@ init([]) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
-handle_call({create_dbase_info,ClusterSpec,InstanceId},_From, State) ->
-    Reply=dbase_info(ClusterSpec,InstanceId),
+handle_call({create_dbase_info,ClusterSpec},_From, State) ->
+    Reply=dbase_info(ClusterSpec),
     {reply, Reply, State};
 
-handle_call({create_connect_nodes,ClusterSpec,InstanceId},_From, State) ->
-    Reply=connect_nodes(ClusterSpec,InstanceId),
+handle_call({create_connect_nodes,ClusterSpec},_From, State) ->
+    Reply=connect_nodes(ClusterSpec),
     {reply, Reply, State};
 
 
@@ -137,20 +135,19 @@ handle_call(Request, From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
-handle_cast({start_monitoring,ClusterSpec,InstanceId}, State) ->
+handle_cast({start_monitoring,ClusterSpec}, State) ->
     NewState=State#state{
 	       cluster_spec=ClusterSpec,
-	       instance_id=InstanceId,
 	       present_connect_nodes=[],
 	       missing_connect_nodes=[]
 	      },
-    spawn(fun()->hbeat(ClusterSpec,InstanceId) end),
+    spawn(fun()->hbeat(ClusterSpec) end),
     {noreply, NewState};
 
 
 handle_cast({heartbeat}, State) ->
-    NewPresentConnectNodes=present_connect_nodes(State#state.instance_id),
-    NewMissingConnectNodes=missing_connect_nodes(State#state.instance_id),
+    NewPresentConnectNodes=present_connect_nodes(State#state.cluster_spec),
+    NewMissingConnectNodes=missing_connect_nodes(State#state.cluster_spec),
    
     
     NoChangeStatus=lists:sort(NewPresentConnectNodes) =:= lists:sort(State#state.present_connect_nodes),
@@ -170,7 +167,7 @@ handle_cast({heartbeat}, State) ->
     NewState=State#state{present_connect_nodes=NewPresentConnectNodes,
 			 missing_connect_nodes=NewMissingConnectNodes},
   
-    spawn(fun()->hbeat(State#state.cluster_spec,State#state.instance_id) end),
+    spawn(fun()->hbeat(State#state.cluster_spec) end),
     {noreply, NewState};
 
 handle_cast(Msg, State) ->
@@ -215,18 +212,18 @@ code_change(_OldVsn, State, _Extra) ->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-hbeat(InstanceId,ClusterSpec)->
-    rpc:call(node(),?MODULE,wanted_state,[ClusterSpec,InstanceId],30*1000), 
+hbeat(ClusterSpec)->
+    rpc:call(node(),?MODULE,wanted_state,[ClusterSpec],30*1000), 
     rpc:cast(node(),?MODULE,heartbeat,[]).
 %% --------------------------------------------------------------------
 %% Function: terminate/2
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-wanted_state(ClusterSpec,InstanceId)->
-    NodesToConnect=db_cluster_instance:nodes(connect,InstanceId),
-    MissingConnectNodes=missing_connect_nodes(InstanceId),
-    [create_connect_node(InstanceId,ClusterSpec,PodNode,NodesToConnect)||PodNode<-MissingConnectNodes],
+wanted_state(ClusterSpec)->
+    NodesToConnect=db_cluster_instance:nodes(connect,ClusterSpec),
+    MissingConnectNodes=missing_connect_nodes(ClusterSpec),
+    [create_connect_node(ClusterSpec,PodNode,NodesToConnect)||PodNode<-MissingConnectNodes],
     ok.
 
 
@@ -235,24 +232,24 @@ wanted_state(ClusterSpec,InstanceId)->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-missing_connect_nodes(InstanceId)->
-    [Node||Node<-db_cluster_instance:nodes(connect,InstanceId), 
+missing_connect_nodes(ClusterSpec)->
+    [Node||Node<-db_cluster_instance:nodes(connect,ClusterSpec), 
 	   pang=:=net_adm:ping(Node)].
-present_connect_nodes(InstanceId)->
-    [Node||Node<-db_cluster_instance:nodes(connect,InstanceId), 
+present_connect_nodes(ClusterSpec)->
+    [Node||Node<-db_cluster_instance:nodes(connect,ClusterSpec), 
 	   pong=:=net_adm:ping(Node)].
 %% --------------------------------------------------------------------
 %% Function: terminate/2
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-dbase_info(ClusterSpec,InstanceId)->
+dbase_info(ClusterSpec)->
     {ok,ControllerHostSpecs}=db_cluster_spec:read(controller_host_specs,ClusterSpec),
     {ok,WorkerHostSpecs}=db_cluster_spec:read(worker_host_specs,ClusterSpec),
     ConnectHostSpecs=list_duplicates:remove(lists:append(ControllerHostSpecs,WorkerHostSpecs)),
-    dbase_info(ConnectHostSpecs,InstanceId,ClusterSpec,[]).
+    dbase_info(ConnectHostSpecs,ClusterSpec,[]).
     
-dbase_info([],_InstanceId,_ClusterSpec,Acc)->
+dbase_info([],_ClusterSpec,Acc)->
     ErrorList=[{error,[Reason]}||{error,[Reason]}<-Acc],
     case ErrorList of
 	[]->
@@ -260,7 +257,7 @@ dbase_info([],_InstanceId,_ClusterSpec,Acc)->
         Reason->
 	    {error,Reason}
     end;
-dbase_info([HostSpec|T],InstanceId,ClusterSpec,Acc)->
+dbase_info([HostSpec|T],ClusterSpec,Acc)->
     {ok,ClusterDir}=db_cluster_spec:read(dir,ClusterSpec),
     {ok,HostName}=db_host_spec:read(hostname,HostSpec),
     PodName=ClusterSpec++"_connect",
@@ -268,13 +265,13 @@ dbase_info([HostSpec|T],InstanceId,ClusterSpec,Acc)->
     PodDir=ClusterDir,
     Type=connect,
     Status=candidate,
-    NewAcc=case db_cluster_instance:create(InstanceId,ClusterSpec,Type,PodName,PodNode,PodDir,HostSpec,Status) of
+    NewAcc=case db_cluster_instance:create(ClusterSpec,Type,PodName,PodNode,PodDir,HostSpec,Status) of
 	       {atomic,ok}->
 		   [ok|Acc];
 	       Reason->
 		   [{error,[Reason]}|Acc]
 	   end,
-    dbase_info(T,InstanceId,ClusterSpec,NewAcc).
+    dbase_info(T,ClusterSpec,NewAcc).
      
 %% --------------------------------------------------------------------
 %% Function: terminate/2
@@ -283,22 +280,22 @@ dbase_info([HostSpec|T],InstanceId,ClusterSpec,Acc)->
 %% --------------------------------------------------------------------
 -define(TimeOut,10*1000).
 
-connect_nodes(ClusterSpec,InstanceId)->
-    NodesToConnect=db_cluster_instance:nodes(connect,InstanceId),
+connect_nodes(ClusterSpec)->
+    NodesToConnect=db_cluster_instance:nodes(connect,ClusterSpec),
     MissingConnectNodes=[Node||Node<-NodesToConnect, 
 			       pang=:=net_adm:ping(Node)],
-    [create_connect_node(InstanceId,ClusterSpec,PodNode,NodesToConnect)||PodNode<-MissingConnectNodes].
+    [create_connect_node(ClusterSpec,PodNode,NodesToConnect)||PodNode<-MissingConnectNodes].
     
-create_connect_node(InstanceId,ClusterSpec,PodNode,NodesToConnect)->
+create_connect_node(ClusterSpec,PodNode,NodesToConnect)->
     io:format("INFO: create new/restart connect_node  ~p~n",[{date(),time()}]), 
     io:format("INFO: Cluster and PodNode   ~p~n",[{ClusterSpec,PodNode}]),  
     
     {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
-    {ok,HostSpec}=db_cluster_instance:read(host_spec,InstanceId,PodNode),
+    {ok,HostSpec}=db_cluster_instance:read(host_spec,ClusterSpec,PodNode),
     {ok,HostName}=db_host_spec:read(hostname,HostSpec),
     
-    {ok,PodName}=db_cluster_instance:read(pod_name,InstanceId,PodNode),
-    {ok,PodDir}=db_cluster_instance:read(pod_dir,InstanceId,PodNode),
+    {ok,PodName}=db_cluster_instance:read(pod_name,ClusterSpec,PodNode),
+    {ok,PodDir}=db_cluster_instance:read(pod_dir,ClusterSpec,PodNode),
     PaArgs=" -detached ",
     EnvArgs=" ",
     ops_vm:ssh_create(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,NodesToConnect,?TimeOut).

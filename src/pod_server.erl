@@ -19,8 +19,8 @@
 
 %% External exports
 -export([
-	 create_controller_pods/2, 
-	 create_worker_pods/2,
+	 create_controller_pods/1, 
+	 create_worker_pods/1,
 	 get_pod/2,
 	 present_controller_nodes/0,
 	 present_worker_nodes/0,
@@ -30,8 +30,8 @@
 
 
 -export([
-	 start_monitoring/2,
-	 wanted_state/2,
+	 start_monitoring/1,
+	 wanted_state/1,
 	 heartbeat/0
 	]).
 -export([
@@ -49,7 +49,6 @@
 %%-------------------------------------------------------------------
 -record(state,{
 	       cluster_spec,
-	       instance_id,
 	       present_controller_nodes,
 	       missing_controller_nodes,
 	       present_worker_nodes,
@@ -66,13 +65,11 @@
 start()-> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 stop()-> gen_server:call(?MODULE, {stop},infinity).
 
-create_controller_pods(ClusterSpec,InstanceId)->
-    gen_server:call(?MODULE, {create_controller_pods,ClusterSpec,InstanceId},infinity).
- %    controller_pods(ClusterSpec,InstanceId).
+create_controller_pods(ClusterSpec)->
+    gen_server:call(?MODULE, {create_controller_pods,ClusterSpec},infinity).
 
-create_worker_pods(ClusterSpec,InstanceId)->
-    gen_server:call(?MODULE, {create_worker_pods,ClusterSpec,InstanceId},infinity).
-%    worker_pods(ClusterSpec,InstanceId).
+create_worker_pods(ClusterSpec)->
+    gen_server:call(?MODULE, {create_worker_pods,ClusterSpec},infinity).
 
 get_pod(ApplSpec,HostSpec)->
       gen_server:call(?MODULE, {get_pod,ApplSpec,HostSpec},infinity).
@@ -82,12 +79,11 @@ present_controller_nodes()->
 present_worker_nodes()->
     gen_server:call(?MODULE, {present_workers},infinity).
 
-
 ping() ->
     gen_server:call(?MODULE, {ping}).
 %% cast
-start_monitoring(ClusterSpec,InstanceId)->
-    gen_server:cast(?MODULE, {start_monitoring,ClusterSpec,InstanceId}).
+start_monitoring(ClusterSpec)->
+    gen_server:cast(?MODULE, {start_monitoring,ClusterSpec}).
 
 heartbeat()-> 
     gen_server:cast(?MODULE, {heartbeat}).
@@ -108,7 +104,6 @@ init([]) ->
     io:format("Started Server ~p~n",[{?MODULE,?LINE}]),
 
     {ok, #state{cluster_spec=undefined,
-		instance_id=undefined,
 		present_controller_nodes=undefined,
 		missing_controller_nodes=undefined,
 		present_worker_nodes=undefined,
@@ -126,20 +121,20 @@ init([]) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
 
-handle_call({create_controller_pods,ClusterSpec,InstanceId},_From, State) ->
-    controller_pods(ClusterSpec,InstanceId) ,
-    PresentControllerNodes=present_controller_nodes(InstanceId),
-    MissingControllerNodes=missing_controller_nodes(InstanceId),
+handle_call({create_controller_pods,ClusterSpec},_From, State) ->
+    controller_pods(ClusterSpec),
+    PresentControllerNodes=present_controller_nodes(ClusterSpec),
+    MissingControllerNodes=missing_controller_nodes(ClusterSpec),
     NewState=State#state{present_controller_nodes=PresentControllerNodes,
 			 missing_controller_nodes=MissingControllerNodes		    
 			},
     Reply={PresentControllerNodes,MissingControllerNodes},
     {reply, Reply, NewState};
 
-handle_call({create_worker_pods,ClusterSpec,InstanceId},_From, State) ->
-    worker_pods(ClusterSpec,InstanceId) ,
-    PresentWorkerNodes=present_worker_nodes(InstanceId),
-    MissingWorkerNodes=missing_worker_nodes(InstanceId),
+handle_call({create_worker_pods,ClusterSpec},_From, State) ->
+    worker_pods(ClusterSpec,ClusterSpec) ,
+    PresentWorkerNodes=present_worker_nodes(ClusterSpec),
+    MissingWorkerNodes=missing_worker_nodes(ClusterSpec),
     NewState=State#state{present_worker_nodes=PresentWorkerNodes,
 			 missing_worker_nodes=MissingWorkerNodes		    
 			},
@@ -195,35 +190,34 @@ handle_call(Request, From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
-handle_cast({start_monitoring,ClusterSpec,InstanceId}, State) ->
+handle_cast({start_monitoring,ClusterSpec}, State) ->
 
-    PresentControllerNodes=present_controller_nodes(InstanceId),
-    MissingControllerNodes=missing_controller_nodes(InstanceId),
+    PresentControllerNodes=present_controller_nodes(ClusterSpec),
+    MissingControllerNodes=missing_controller_nodes(ClusterSpec),
     io:format("INFO:PresentControllerNodes ~p~n",[PresentControllerNodes]),   
     io:format("INFO:MissingControllerNodes ~p~n",[MissingControllerNodes]),
     
-    PresentWorkerNodes=present_worker_nodes(InstanceId),
-    MissingWorkerNodes=missing_worker_nodes(InstanceId),
+    PresentWorkerNodes=present_worker_nodes(ClusterSpec),
+    MissingWorkerNodes=missing_worker_nodes(ClusterSpec),
     io:format("INFO:PresentWorkerNodes ~p~n",[PresentWorkerNodes]),   
     io:format("INFO:MissingWorkerNodes ~p~n",[MissingWorkerNodes]),
 
     NewState=State#state{cluster_spec=ClusterSpec,
-			     instance_id=InstanceId,
-			     present_controller_nodes=PresentControllerNodes,
-			     missing_controller_nodes=MissingControllerNodes,
-			     present_worker_nodes=PresentWorkerNodes,
-			     missing_worker_nodes=MissingWorkerNodes
-			    },
+			 present_controller_nodes=PresentControllerNodes,
+			 missing_controller_nodes=MissingControllerNodes,
+			 present_worker_nodes=PresentWorkerNodes,
+			 missing_worker_nodes=MissingWorkerNodes
+			},
 
-    spawn(fun()->hbeat(ClusterSpec,InstanceId) end),
+    spawn(fun()->hbeat(ClusterSpec) end),
     {noreply, NewState};
 
 handle_cast({heartbeat}, State) ->
 
-    NewPresentControllerNodes=present_controller_nodes(State#state.instance_id),
-    NewMissingControllerNodes=missing_controller_nodes(State#state.instance_id),
-    NewPresentWorkerNodes=present_worker_nodes(State#state.instance_id),
-    NewMissingWorkerNodes=missing_worker_nodes(State#state.instance_id),
+    NewPresentControllerNodes=present_controller_nodes(State#state.cluster_spec),
+    NewMissingControllerNodes=missing_controller_nodes(State#state.cluster_spec),
+    NewPresentWorkerNodes=present_worker_nodes(State#state.cluster_spec),
+    NewMissingWorkerNodes=missing_worker_nodes(State#state.cluster_spec),
   
 
     NoChangeStatusController=lists:sort(NewPresentControllerNodes) =:= lists:sort(State#state.present_controller_nodes),
@@ -258,7 +252,7 @@ handle_cast({heartbeat}, State) ->
 			 present_worker_nodes=NewPresentWorkerNodes,
 			 missing_worker_nodes=NewMissingWorkerNodes},
   
-    spawn(fun()->hbeat(State#state.cluster_spec,State#state.instance_id) end),
+    spawn(fun()->hbeat(State#state.cluster_spec) end),
     {noreply, NewState};
 
 handle_cast(Msg, State) ->
@@ -303,8 +297,8 @@ code_change(_OldVsn, State, _Extra) ->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-hbeat(InstanceId,ClusterSpec)->
-    rpc:call(node(),?MODULE,wanted_state,[ClusterSpec,InstanceId],30*1000), 
+hbeat(ClusterSpec)->
+    rpc:call(node(),?MODULE,wanted_state,[ClusterSpec],30*1000), 
     rpc:cast(node(),?MODULE,heartbeat,[]).
 
 %% --------------------------------------------------------------------
@@ -319,22 +313,22 @@ hbeat(InstanceId,ClusterSpec)->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-wanted_state(InstanceId,_ClusterSpec)->
-    MissingControllerNodes=missing_controller_nodes(InstanceId),
-    MissingWorkerNodes=missing_worker_nodes(InstanceId),
-    [restart_pod(InstanceId,PodNode)||PodNode<-MissingControllerNodes],
-    [restart_pod(InstanceId,PodNode)||PodNode<-MissingWorkerNodes],
+wanted_state(ClusterSpec)->
+    MissingControllerNodes=missing_controller_nodes(ClusterSpec),
+    MissingWorkerNodes=missing_worker_nodes(ClusterSpec),
+    [restart_pod(ClusterSpec,PodNode)||PodNode<-MissingControllerNodes],
+    [restart_pod(ClusterSpec,PodNode)||PodNode<-MissingWorkerNodes],
     ok.
 %% --------------------------------------------------------------------
 %% Function: terminate/2
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-missing_controller_nodes(InstanceId)->
-    [Node||Node<-db_cluster_instance:nodes(controller,InstanceId), 
+missing_controller_nodes(ClusterSpec)->
+    [Node||Node<-db_cluster_instance:nodes(controller,ClusterSpec), 
 	   pang=:=net_adm:ping(Node)].
-present_controller_nodes(InstanceId)->
-    [Node||Node<-db_cluster_instance:nodes(controller,InstanceId), 
+present_controller_nodes(ClusterSpec)->
+    [Node||Node<-db_cluster_instance:nodes(controller,ClusterSpec), 
 	   pong=:=net_adm:ping(Node)].
 
 %% --------------------------------------------------------------------
@@ -342,11 +336,11 @@ present_controller_nodes(InstanceId)->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-missing_worker_nodes(InstanceId)->
-    [Node||Node<-db_cluster_instance:nodes(worker,InstanceId), 
+missing_worker_nodes(ClusterSpec)->
+    [Node||Node<-db_cluster_instance:nodes(worker,ClusterSpec), 
 	   pang=:=net_adm:ping(Node)].
-present_worker_nodes(InstanceId)->
-    [Node||Node<-db_cluster_instance:nodes(worker,InstanceId), 
+present_worker_nodes(ClusterSpec)->
+    [Node||Node<-db_cluster_instance:nodes(worker,ClusterSpec), 
 	   pong=:=net_adm:ping(Node)].
 %% --------------------------------------------------------------------
 %% Function: terminate/2
@@ -358,18 +352,17 @@ present_worker_nodes(InstanceId)->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-restart_pod(InstanceId,PodNode)->
-    {ok,ClusterSpec}=db_cluster_instance:read(cluster_spec,InstanceId,PodNode),
-    {ok,HostSpec}=db_cluster_instance:read(host_spec,InstanceId,PodNode),
+restart_pod(ClusterSpec,PodNode)->
+    {ok,HostSpec}=db_cluster_instance:read(host_spec,ClusterSpec,PodNode),
     {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
-    ConnectNodes=db_cluster_instance:nodes(connect,InstanceId),
+    ConnectNodes=db_cluster_instance:nodes(connect,ClusterSpec),
     
     {ok,HostName}=db_host_spec:read(hostname,HostSpec),
   %  UniqueId=os:system_time(microsecond),
   %  PodName=erlang:integer_to_list(UniqueId,36)++"_"++ClusterSpec++"_controller",
-    {ok,PodName}=db_cluster_instance:read(pod_name,InstanceId,PodNode),
+    {ok,PodName}=db_cluster_instance:read(pod_name,ClusterSpec,PodNode),
     rpc:call(PodNode,init,stop,[]),
-    {ok,PodDir}=db_cluster_instance:read(pod_dir,InstanceId,PodNode),
+    {ok,PodDir}=db_cluster_instance:read(pod_dir,ClusterSpec,PodNode),
     
     PaArgs=" -detached ",
     EnvArgs=" ",
@@ -382,15 +375,15 @@ restart_pod(InstanceId,PodNode)->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-controller_pods(ClusterSpec,InstanceId)->
+controller_pods(ClusterSpec)->
     {ok,NumControllers}=db_cluster_spec:read(num_controllers,ClusterSpec),
     {ok,ControllerHostSpecs}=db_cluster_spec:read(controller_host_specs,ClusterSpec),
-    create_controller_pod(InstanceId,ClusterSpec,NumControllers,ControllerHostSpecs,[]).
+    create_controller_pod(ClusterSpec,NumControllers,ControllerHostSpecs,[]).
     
-create_controller_pod(_InstanceId,_ClusterSpec,0,_ControllerHostSpecs,Acc)->
+create_controller_pod(_ClusterSpec,0,_ControllerHostSpecs,Acc)->
     Acc;
-create_controller_pod(InstanceId,ClusterSpec,N,[HostSpec|T],Acc) ->
-    ConnectNodes=db_cluster_instance:nodes(connect,InstanceId),
+create_controller_pod(ClusterSpec,N,[HostSpec|T],Acc) ->
+    ConnectNodes=db_cluster_instance:nodes(connect,ClusterSpec),
     {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
     {ok,ClusterDir}=db_cluster_spec:read(dir,ClusterSpec),
     {ok,HostName}=db_host_spec:read(hostname,HostSpec),
@@ -402,28 +395,28 @@ create_controller_pod(InstanceId,ClusterSpec,N,[HostSpec|T],Acc) ->
     PodDir=filename:join(ClusterDir,PodDirName),
     Type=controller,
     Status=candidate,
-    db_cluster_instance:create(InstanceId,ClusterSpec,Type,PodName,PodNode,PodDir,HostSpec,Status),
+    db_cluster_instance:create(ClusterSpec,Type,PodName,PodNode,PodDir,HostSpec,Status),
     PaArgs=" -detached ",
     EnvArgs=" ",
     R=create_pod_node(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,?TimeOut),
     RotatedHostSpecList=lists:append(T,[HostSpec]),
     io:format("INFO: Create controller pod ~p~n",[{PodNode, ?MODULE,?LINE}]),
-    create_controller_pod(InstanceId,ClusterSpec,N-1,RotatedHostSpecList,[R|Acc]).
+    create_controller_pod(ClusterSpec,N-1,RotatedHostSpecList,[R|Acc]).
     
 %% --------------------------------------------------------------------
 %% Function: terminate/2
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-worker_pods(ClusterSpec,InstanceId)->
+worker_pods(ClusterSpec,ClusterSpec)->
     {ok,NumWorkers}=db_cluster_spec:read(num_workers,ClusterSpec),
     {ok,WorkerHostSpecs}=db_cluster_spec:read(worker_host_specs,ClusterSpec),
-    create_worker_pod(InstanceId,ClusterSpec,NumWorkers,WorkerHostSpecs,[]).
+    create_worker_pod(ClusterSpec,NumWorkers,WorkerHostSpecs,[]).
 
-create_worker_pod(_InstanceId,_ClusterSpec,0,_WorkerHostSpecs,Acc)->
+create_worker_pod(_ClusterSpec,0,_WorkerHostSpecs,Acc)->
     Acc;
-create_worker_pod(InstanceId,ClusterSpec,N,[HostSpec|T],Acc) ->
-    ConnectNodes=db_cluster_instance:nodes(connect,InstanceId),
+create_worker_pod(ClusterSpec,N,[HostSpec|T],Acc) ->
+    ConnectNodes=db_cluster_instance:nodes(connect,ClusterSpec),
     {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
     {ok,ClusterDir}=db_cluster_spec:read(dir,ClusterSpec),
     {ok,HostName}=db_host_spec:read(hostname,HostSpec),
@@ -434,13 +427,13 @@ create_worker_pod(InstanceId,ClusterSpec,N,[HostSpec|T],Acc) ->
     PodDir=filename:join(ClusterDir,PodDirName),
     Type=worker,
     Status=candidate,
-    db_cluster_instance:create(InstanceId,ClusterSpec,Type,PodName,PodNode,PodDir,HostSpec,Status),
+    db_cluster_instance:create(ClusterSpec,Type,PodName,PodNode,PodDir,HostSpec,Status),
     PaArgs=" -detached ",
     EnvArgs=" ",
     R=create_pod_node(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,?TimeOut),
     RotatedHostSpecList=lists:append(T,[HostSpec]),
     io:format("INFO: Create worker pod ~p~n",[{PodNode, ?MODULE,?LINE}]),
-    create_worker_pod(InstanceId,ClusterSpec,N-1,RotatedHostSpecList,[R|Acc]).
+    create_worker_pod(ClusterSpec,N-1,RotatedHostSpecList,[R|Acc]).
     
 %% --------------------------------------------------------------------
 %% Function: terminate/2

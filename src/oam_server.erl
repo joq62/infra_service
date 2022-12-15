@@ -141,6 +141,7 @@ ping() ->
 init([]) -> 
     io:format("Started Server ~p~n",[{?MODULE,?LINE}]),
    
+    
     db_etcd:install(),
     ok=db_appl_instance:create_table(),
     ok=db_cluster_instance:create_table(),
@@ -159,15 +160,27 @@ init([]) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
+%handle_call({start_nodelog,ClusterSpec,HostSpec,LogDir,LogFile},_From, State) ->
+    
+   % {ok,ClusterDir}=db_cluster_spec:read(dir,ClusterSpec),
+   % HostSpec
+   % PathLogDir=filename:join([ClusterDir,LogDir]),
+   % os:cmd("rm -rf "++PathLogDir),
+   % LogFilePath=filename:join([PathLogDir,LogFile]),
+   % LogFile1=filename:join(["test_log_dir","logs","test1.logs"]),
+   % ok=rpc:call(node(),nodelog,create,[LogFile1],5000),
+ %   Reply=ok,
+  %  {reply, Reply, State};
+
 handle_call({deploy_appls,ClusterSpec},_From, State) ->
-    Reply= case lists:keyfind(ClusterSpec,1,State#state.cluster_specs) of
+    Reply= case lists:member(ClusterSpec,State#state.cluster_specs) of
 	       false->
 		   {error,[eexists,ClusterSpec,?MODULE,?LINE]};
-	       {ClusterSpec,InstanceId}->
+	       true->
 		   CurrentCookie=erlang:get_cookie(),
 		   {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
 		   erlang:set_cookie(node(),list_to_atom(Cookie)),
-		   R=appl_server:deploy_appls(ClusterSpec,InstanceId),
+		   R=appl_server:deploy_appls(ClusterSpec),
 		   erlang:set_cookie(node(),CurrentCookie),
 		   R
 	end,
@@ -175,14 +188,14 @@ handle_call({deploy_appls,ClusterSpec},_From, State) ->
 
 
 handle_call({new_appl,ApplSpec,HostSpec,ClusterSpec},_From, State) ->
-    Reply= case lists:keyfind(ClusterSpec,1,State#state.cluster_specs) of
+    Reply=  case lists:member(ClusterSpec,State#state.cluster_specs) of
 	       false->
 		   {error,[eexists,ClusterSpec,?MODULE,?LINE]};
-	       {ClusterSpec,InstanceId}->
+	       true->
 		   CurrentCookie=erlang:get_cookie(),
 		   {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
 		   erlang:set_cookie(node(),list_to_atom(Cookie)),
-		   R=appl_server:new(ApplSpec,HostSpec,ClusterSpec,InstanceId),
+		   R=appl_server:new(ApplSpec,HostSpec,ClusterSpec),
 		   erlang:set_cookie(node(),CurrentCookie),
 		   R
 	end,
@@ -204,15 +217,14 @@ handle_call({update_appl,AppSpec,PodNode,HostSpec},_From, State) ->
     {reply, Reply, State};
 
 handle_call({new_db_info,ClusterSpec},_From, State) ->
-    Reply=case lists:keymember(ClusterSpec,1,State#state.cluster_specs) of
+    Reply=case lists:member(ClusterSpec,State#state.cluster_specs) of
 	      true->
 		  NewState=State,
 		  {error,[already_created,ClusterSpec]};
 	      false->
-		  InstanceId=erlang:integer_to_list(os:system_time(microsecond),36)++"_id",
-		  case connect_server:create_dbase_info(ClusterSpec,InstanceId) of
+		  case connect_server:create_dbase_info(ClusterSpec) of
 		      ok->
-			  NewState=State#state{cluster_specs=[{ClusterSpec,InstanceId}|State#state.cluster_specs]},
+			  NewState=State#state{cluster_specs=[ClusterSpec|State#state.cluster_specs]},
 			  ok;
 		      {error,Reason} ->
 			  NewState=State,
@@ -222,58 +234,58 @@ handle_call({new_db_info,ClusterSpec},_From, State) ->
  {reply, Reply, NewState};
 
 handle_call({new_connect_nodes,ClusterSpec},_From, State) ->
-    Reply= case lists:keyfind(ClusterSpec,1,State#state.cluster_specs) of
+    Reply= case lists:member(ClusterSpec,State#state.cluster_specs) of
 	       false->
 		   NewState=State,
 		   {error,[eexists,ClusterSpec,?MODULE,?LINE]};
-	       {ClusterSpec,InstanceId}->
+	       true->
 		   CurrentCookie=erlang:get_cookie(),
 		   {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
 		   erlang:set_cookie(node(),list_to_atom(Cookie)),
-		   connect_server:create_connect_nodes(ClusterSpec,InstanceId),
+		   connect_server:create_connect_nodes(ClusterSpec),
 		   erlang:set_cookie(node(),CurrentCookie),
-		   NewState=State#state{cluster_specs=[{ClusterSpec,InstanceId}|State#state.cluster_specs]},
+		   NewState=State#state{cluster_specs=[ClusterSpec|State#state.cluster_specs]},
 		   ok
 	  end,
  {reply, Reply, NewState};
 
 handle_call({new_controllers,ClusterSpec},_From, State) ->
-    Reply= case lists:keyfind(ClusterSpec,1,State#state.cluster_specs) of
+    Reply=case lists:member(ClusterSpec,State#state.cluster_specs) of
 	       false->
-		   {error,[eexists,ClusterSpec,?MODULE,?LINE]};
-	       {ClusterSpec,InstanceId}->
+		  {error,[eexists,ClusterSpec,?MODULE,?LINE]};
+	       true->
 		   CurrentCookie=erlang:get_cookie(),
 		   {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
 		   erlang:set_cookie(node(),list_to_atom(Cookie)),
-		   pod_server:create_controller_pods(ClusterSpec,InstanceId),
+		   pod_server:create_controller_pods(ClusterSpec),
 		   erlang:set_cookie(node(),CurrentCookie),
 		   ok
 	   end,
     {reply, Reply, State};
 
 handle_call({new_workers,ClusterSpec},_From, State) ->
-    Reply= case lists:keyfind(ClusterSpec,1,State#state.cluster_specs) of
+    Reply= case lists:member(ClusterSpec,State#state.cluster_specs) of
 	       false->
 		   {error,[eexists,ClusterSpec,?MODULE,?LINE]};
-	       {ClusterSpec,InstanceId}->
+	       true->
 		   CurrentCookie=erlang:get_cookie(),
 		   {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
 		   erlang:set_cookie(node(),list_to_atom(Cookie)),
-		   pod_server:create_worker_pods(ClusterSpec,InstanceId),
+		   pod_server:create_worker_pods(ClusterSpec),
 		   erlang:set_cookie(node(),CurrentCookie),
 		   ok
 	   end,
     {reply, Reply, State};
 
 handle_call({ping_connect_nodes,ClusterSpec},_From, State) ->
-    Reply= case lists:keyfind(ClusterSpec,1,State#state.cluster_specs) of
+    Reply=case lists:member(ClusterSpec,State#state.cluster_specs) of
 	       false->
-		   {error,[eexists,ClusterSpec,?MODULE,?LINE]};
-	       {ClusterSpec,InstanceId}->
+		  {error,[eexists,ClusterSpec,?MODULE,?LINE]};
+	       true->
 		   CurrentCookie=erlang:get_cookie(),
 		   {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
 		   erlang:set_cookie(node(),list_to_atom(Cookie)),
-		   ConnectNodes=db_cluster_instance:nodes(connect,InstanceId),
+		   ConnectNodes=db_cluster_instance:nodes(connect,ClusterSpec),
 		   PingConnectNodes=[{net_adm:ping(Node),Node}||Node<-ConnectNodes],
 		   erlang:set_cookie(node(),CurrentCookie),
 		  
@@ -282,19 +294,19 @@ handle_call({ping_connect_nodes,ClusterSpec},_From, State) ->
     {reply, Reply, State};
 
 handle_call({is_cluster_deployed,ClusterSpec},_From, State) ->
-    Reply=lists:keymember(ClusterSpec,1,State#state.cluster_specs),
+    Reply=lists:member(ClusterSpec,State#state.cluster_specs),
     {reply, Reply, State};
 
-handle_call({delete_cluster,_ClusterInstance},_From, State) ->
+handle_call({delete_cluster,_ClusterSpec},_From, State) ->
     Reply=pong,
     {reply, Reply, State};
 
 
 handle_call({all_apps,ClusterSpec},_From, State) ->
-    Reply= case lists:keyfind(ClusterSpec,1,State#state.cluster_specs) of
+    Reply= case lists:member(ClusterSpec,State#state.cluster_specs) of
 	       false->
 		   {error,[eexists,ClusterSpec,?MODULE,?LINE]};
-	       {ClusterSpec,_InstanceId}->
+	       true->
 		   CurrentCookie=erlang:get_cookie(),
 		   {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
 		   erlang:set_cookie(node(),list_to_atom(Cookie)),
@@ -311,10 +323,10 @@ handle_call({all_apps,ClusterSpec},_From, State) ->
     {reply, Reply, State};
 
 handle_call({where_is_app,ClusterSpec,App},_From, State) ->
-    Reply= case lists:keyfind(ClusterSpec,1,State#state.cluster_specs) of
+    Reply= case lists:member(ClusterSpec,State#state.cluster_specs) of
 	       false->
 		   {error,[eexists,ClusterSpec,?MODULE,?LINE]};
-	       {ClusterSpec,_InstanceId}->
+	       true->
 		   CurrentCookie=erlang:get_cookie(),
 		   {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
 		   erlang:set_cookie(node(),list_to_atom(Cookie)),
@@ -332,30 +344,30 @@ handle_call({where_is_app,ClusterSpec,App},_From, State) ->
     {reply, Reply, State};
 
 handle_call({present_apps,ClusterSpec},_From, State) ->
-    Reply= case lists:keyfind(ClusterSpec,1,State#state.cluster_specs) of
+    Reply=case lists:member(ClusterSpec,State#state.cluster_specs) of
 	       false->
-		   {error,[eexists,ClusterSpec,?MODULE,?LINE]};
-	       {ClusterSpec,InstanceId}->
-		   PresentApps=appl_server:present_apps(InstanceId),
+		  {error,[eexists,ClusterSpec,?MODULE,?LINE]};
+	       true->
+		   PresentApps=appl_server:present_apps(ClusterSpec),
 		   {ok,PresentApps}
 	    end,
     {reply, Reply, State};
 
 handle_call({missing_apps,ClusterSpec},_From, State) ->
-    Reply= case lists:keyfind(ClusterSpec,1,State#state.cluster_specs) of
+    Reply= case lists:member(ClusterSpec,State#state.cluster_specs) of
 	       false->
-		   {error,[eexists,ClusterSpec,?MODULE,?LINE]};
-	       {ClusterSpec,InstanceId}->
-		   PresentApps=appl_server:missing_apps(InstanceId),
+     		   {error,[eexists,ClusterSpec,?MODULE,?LINE]};
+	       true->
+		   PresentApps=appl_server:missing_apps(ClusterSpec),
 		   {ok,PresentApps}
 	    end,
     {reply, Reply, State};
 
 handle_call({call,ClusterSpec,PodNode,M,F,A,T},_From, State) ->
-    Reply= case lists:keyfind(ClusterSpec,1,State#state.cluster_specs) of
+    Reply=case lists:member(ClusterSpec,State#state.cluster_specs) of
 	       false->
-		   {error,[eexists,ClusterSpec,?MODULE,?LINE]};
-	       {ClusterSpec,_InstanceId}->
+		  {error,[eexists,ClusterSpec,?MODULE,?LINE]};
+	       true->
 		   CurrentCookie=erlang:get_cookie(),
 		   {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
 		   erlang:set_cookie(node(),list_to_atom(Cookie)),

@@ -27,9 +27,9 @@ add_node(Node,StorageType)->
 	   end,
     Result.
 
-create(SpecId,Cookie,ClusterDir,NumControllers,ControllerHostSpecs,NumWorkers,WorkerHostSpecs)->
+create(ClusterSpec,Cookie,ClusterDir,NumControllers,ControllerHostSpecs,NumWorkers,WorkerHostSpecs)->
     Record=#?RECORD{
-		    spec_id=SpecId,
+		    spec_id=ClusterSpec,
 		    cookie=Cookie,
 		    dir=ClusterDir,
 		    num_controllers=NumControllers,
