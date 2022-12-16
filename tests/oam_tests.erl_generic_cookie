@@ -44,18 +44,20 @@ start()->
 %% --------------------------------------------------------------------
 deploy_appls_test()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-    
-    ok=oam:deploy_appls(),
-    _AllApps=oam:all_apps(),
+%     timer:sleep(60*1000),
+    ClusterSpec="c200_c201",
+   
+    ok=oam_server:deploy_appls(ClusterSpec),
+    _AllApps=oam_server:all_apps(ClusterSpec),
   %  io:format("AllApps ~p~n",[{AllApps,?MODULE,?FUNCTION_NAME}]),
-    {ok,HereIsIt}=oam:where_is_app(math),
+    {ok,HereIsIt}=oam_server:where_is_app(ClusterSpec,math),
   %  io:format("HereIsIt ~p~n",[{HereIsIt,?MODULE,?FUNCTION_NAME}]),
     [PodNode|_]=HereIsIt,
-    42=rpc:call(PodNode,test_add,add,[20,22],2000),
+    {ok,42}=oam_server:call(ClusterSpec,PodNode,test_add,add,[20,22],2000),
 
-    {ok,PresentApps}=oam:present_apps(),
+    {ok,PresentApps}=oam_server:present_apps(ClusterSpec),
     io:format("PresentApps ~p~n",[{PresentApps,?MODULE,?FUNCTION_NAME}]),
-    {ok,MissingApps}=oam:missing_apps(),
+    {ok,MissingApps}=oam_server:missing_apps(ClusterSpec),
     io:format("MissingApps ~p~n",[{MissingApps,?MODULE,?FUNCTION_NAME}]),
     
     
@@ -75,34 +77,27 @@ deploy_appls_test()->
 %% --------------------------------------------------------------------
 start_cluster_test()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-    
-    
-    glurk_not_implmented=oam:is_cluster_deployed(),
-    []=oam:new_connect_nodes(),
 
-    ok=oam:new_db_info(),
-    []=oam:new_connect_nodes(),
-    {ok,PingNodes}=oam:ping_connect_nodes(),
+    ClusterSpec1="c200_c201",
+    false=oam_server:is_cluster_deployed(ClusterSpec1),
+    {error,[eexists,"c200_c201",oam_server,_]}=oam_server:new_connect_nodes(ClusterSpec1),
+
+    ok=oam_server:new_db_info(ClusterSpec1),
+    ok=oam_server:new_connect_nodes(ClusterSpec1),
+    {ok,PingNodes}=oam_server:ping_connect_nodes(ClusterSpec1),
     [{pong,'c200_c201_connect@c200'},
      {pong,'c200_c201_connect@c201'}
     ]=lists:sort(PingNodes),
-    ok=oam:new_db_info(),
+    {error,[already_created,"c200_c201"]}=oam_server:new_db_info(ClusterSpec1),
+    ok=oam_server:new_controllers(ClusterSpec1),
+    ok=oam_server:new_workers(ClusterSpec1),
     
-    {PresentControllers,MissingControllers}=oam:new_controllers(),
-    [
-     '1_c200_c201_controller@c201',
-     '2_c200_c201_controller@c200'
-    ]= lists:sort(PresentControllers),
-    []=MissingControllers,
-   
-    {PresentWorkers,MissingWorkers}=oam:new_workers(),
-    [
-     '1_c200_c201_worker@c201','2_c200_c201_worker@c200',
-     '3_c200_c201_worker@c201','4_c200_c201_worker@c200',
-     '5_c200_c201_worker@c201','6_c200_c201_worker@c200'
-    ]=lists:sort(PresentWorkers),
-    []=MissingWorkers,
-    
+    true=oam_server:is_cluster_deployed(ClusterSpec1),
+ %   ClusterSpec2="single_c200",
+ %   ok=oam_server:new_db_info(ClusterSpec2),
+ %   ok=oam_server:new_connect_nodes(ClusterSpec2),
+ %   {ok,PingNodes2}=oam_server:ping_connect_nodes(ClusterSpec2),
+ %   [{pong,'single_c200_connect@c200'}]=lists:sort(PingNodes2),
   
     ok.
 
@@ -133,11 +128,12 @@ setup()->
     {ok,ClusterDir}=db_cluster_spec:read(dir,?ClusterSpec),
     os:cmd("rm -rf "++ClusterDir),
     ok=file:make_dir(ClusterDir),
-    {ok,_}=nodelog_server:start(),
+    {ok,_}=nodelog:start(),
     {ok,_}=resource_discovery_server:start(),
     {ok,_}=connect_server:start(),
     {ok,_}=appl_server:start(),
     {ok,_}=pod_server:start(),
-  
-    ok=application:start(oam),
+ %   
+    {ok,_}=oam_server:start(),
+
     ok.

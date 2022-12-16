@@ -1,0 +1,4 @@
+multiple_app_files: ["/home/joq62/erlang/infra/infra_service/_build/default/lib/nodelog/ebin/nodelog.app",
+                     "/home/joq62/erlang/infra/infra_service/_build/default/lib/nodelog/ebin/nodelog_service.app"]
+[]
+

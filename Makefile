@@ -50,8 +50,6 @@ eunit:
 	rm -rf erl_cra*;
 	rm -rf rebar.lock;
 	rm -rf _build;
-#	rm -rf  application_specs cluster_specs host_specs;
-#	rm -rf  application_deployments cluster_deployments;	
 	rm -rf tests_ebin
 	rm -rf ebin;
 	rm -rf Mnesia.*;
@@ -59,8 +57,10 @@ eunit:
 #	tests 
 	mkdir tests_ebin;
 	erlc -I include -o tests_ebin tests/*.erl;
+	cp tests/*.app tests_ebin;
 #	application
 	mkdir ebin;
 	rebar3 compile;	
-	cp _build/default/lib/*/ebin/* ebin;	
-	erl -pa * -pa ebin -pa tests_ebin -sname do_test -run $(m) start -setcookie test_cookie -hidden
+	cp _build/default/lib/*/ebin/* ebin;
+	erlc -I include -o ebin src/*.erl;
+	erl -pa * -pa ebin -pa tests_ebin -sname do_test -run $(m) start -setcookie test_cookie 

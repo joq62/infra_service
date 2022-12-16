@@ -3,7 +3,7 @@
 %% @end
 %%%-------------------------------------------------------------------
 
--module(controller_sup).
+-module(oam_sup).
 
 -behaviour(supervisor).
 
@@ -12,7 +12,7 @@
 -export([init/1]).
 
 -define(SERVER, ?MODULE).
-
+ 
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
@@ -29,22 +29,9 @@ init([]) ->
     SupFlags = #{strategy => one_for_all,
                  intensity => 0,
                  period => 1},
-     ChildSpecs = [#{id=>common,
-		    start=>{common,start,[]}},
-		  #{id=>resource_discovery,
-		    start=>{resource_discovery_server,start,[]}},
-		   #{id=>db_etcd,
-		    start=>{db_etcd_server,start,[]}},
-		   #{id=>ops_connect_operator,
-		     start=>{ops_connect_operator_server,start,[]}},
-		   #{id=>ops_pod_operator,
-		     start=>{ops_pod_operator_server,start,[]}},
-		   #{id=>ops_appl_operator,
-		     start=>{ops_appl_operator_server,start,[]}},
-		   #{id=>oam,
-		     start=>{oam,start,[]}},
-		   #{id=>ops_node,
-		     start=>{ops_node_server,start,[]}}		   
+     ChildSpecs = [#{id=>oam,
+		    start=>{oam_server,start,[]}}
+		 		   
 		 ],
     {ok, {SupFlags, ChildSpecs}}.
 
