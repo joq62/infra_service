@@ -21,7 +21,7 @@
 %% External exports
 -export([
 	 deploy_appls/1,
-	 new/3,
+	 new/4,
 	 delete/3,
 	 present_apps/1,
 	 missing_apps/1,
@@ -59,8 +59,8 @@
 start()-> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 stop()-> gen_server:call(?MODULE, {stop},infinity).
 
-new(ApplSpec,HostSpec,ClusterSpec)->
-    gen_server:call(?MODULE, {new,ApplSpec,HostSpec,ClusterSpec},infinity).
+new(ApplSpec,HostSpec,ClusterSpec,TimeOut)->
+    gen_server:call(?MODULE, {new,ApplSpec,HostSpec,ClusterSpec,TimeOut},infinity).
 
 delete(ApplSpec,PodNode,ClusterSpec)->
     gen_server:call(?MODULE, {delete,ApplSpec,PodNode,ClusterSpec},infinity).
@@ -114,8 +114,8 @@ init([]) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
-handle_call({new,ApplSpec,HostSpec,ClusterSpec},_From, State) ->
-    Reply=appl_new(ApplSpec,HostSpec,ClusterSpec),
+handle_call({new,ApplSpec,HostSpec,ClusterSpec,TimeOut},_From, State) ->
+    Reply=appl_new(ApplSpec,HostSpec,ClusterSpec,TimeOut),
     {reply, Reply, State};
 
 handle_call({delete,ApplSpec,PodNode,ClusterSpec},_From, State) ->
@@ -243,7 +243,7 @@ appl_del(ApplSpec,PodNode,ClusterSpec)->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-appl_new(ApplSpec,HostSpec,ClusterSpec)->
+appl_new(ApplSpec,HostSpec,ClusterSpec,TimeOut)->
     Result=case pod_server:get_pod(ApplSpec,HostSpec) of
 	       {error,Reason}->
 		   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
@@ -255,20 +255,30 @@ appl_new(ApplSpec,HostSpec,ClusterSpec)->
 		   {ok,PodDir}=db_cluster_instance:read(pod_dir,ClusterSpec,PodNode),
 		   {ok,PodApplGitPath}=db_appl_spec:read(gitpath,ApplSpec),
 		   ApplDir=filename:join([PodDir,ApplSpec]),
-	    
+		   %% set application envs
+		   {ok,ApplicationConfig}=db_host_spec:read(application_config,HostSpec),  
+		   _SetEnvResult=[rpc:call(PodNode,application,set_env,[[Config]],5000)||Config<-ApplicationConfig],
+		   %io:format("DEBUG: SetEnvResult ~p~n",[SetEnvResult]),
+
 		   ok=rpc:call(PodNode,file,make_dir,[ApplDir],5000),
 		   {ok,_}=appl:git_clone_to_dir(PodNode,PodApplGitPath,ApplDir),
 		   {ok,PodApp}=db_appl_spec:read(app,ApplSpec),
 		   ApplEbin=filename:join([ApplDir,"ebin"]),
 		   Paths=[ApplEbin],
+		   
 		   ok=appl:load(PodNode,PodApp,Paths),
-		   ok=appl:start(PodNode,PodApp),
+		   ok=appl:start(PodNode,PodApp,TimeOut),
+		 
 	    
 	     % Init 
 		   {ok,LocalTypeList}=db_appl_spec:read(local_type,ApplSpec),
-		   {ok,TargetTypeList}=db_appl_spec:read(target_type,ApplSpec),
 		   [rpc:call(PodNode,rd,add_local_resource,[LocalType,PodNode],5000)||LocalType<-LocalTypeList],
+		   %% Make it available for oam - debug 
+		   [rd:add_target_resource_type(LocalType)||LocalType<-LocalTypeList],
+
+		   {ok,TargetTypeList}=db_appl_spec:read(target_type,ApplSpec),
 		   [rpc:call(PodNode,rd,add_target_resource_type,[TargetType],5000)||TargetType<-TargetTypeList],
+		   
 		   rpc:call(PodNode,rd,trade_resources,[],5000),
 		   timer:sleep(2000),
 		   {atomic,ok}=db_appl_instance:create(ClusterSpec,ApplSpec,PodNode,HostSpec,{date(),time()}),
@@ -276,7 +286,6 @@ appl_new(ApplSpec,HostSpec,ClusterSpec)->
 		   {ok,PodNode}
 	   end,
     Result.
-
 %% --------------------------------------------------------------------
 %% Function: terminate/2
 %% Description: Shutdown the server
@@ -340,11 +349,11 @@ start_appl([{_Id,ApplSpec,_Vsn,ClusterSpec,NumInstances,Affinity}|T],CurrentClus
 start_appl(_ApplSpec,_ClusterSpec,0,_Affinity,_WorkerHostSpecs)->
     ok;
 start_appl(ApplSpec,ClusterSpec,N,any_host,[HostSpec|T])->
-    _R=appl_new(ApplSpec,HostSpec,ClusterSpec),
+    _R=appl_new(ApplSpec,HostSpec,ClusterSpec,60*1000),
     RotatedHostSpecList=lists:append(T,[HostSpec]),
     start_appl(ApplSpec,ClusterSpec,N-1,any_host,RotatedHostSpecList);
 start_appl(ApplSpec,ClusterSpec,N,[HostSpec|T],WorkerHostSpecs)->
-    _R=appl_new(ApplSpec,HostSpec,ClusterSpec),
+    _R=appl_new(ApplSpec,HostSpec,ClusterSpec,60*1000),
     RotatedHostSpecList=lists:append(T,[HostSpec]),
     start_appl(ApplSpec,ClusterSpec,N-1,RotatedHostSpecList,WorkerHostSpecs).
 

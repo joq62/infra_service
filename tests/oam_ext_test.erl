@@ -9,7 +9,7 @@
 %%% Pod consits beams from all services, app and app and sup erl.
 %%% The setup of envs is
 %%% -------------------------------------------------------------------
--module(oam_tests).      
+-module(oam_ext_test).       
  
 -export([start/0]).
 %% --------------------------------------------------------------------
@@ -27,8 +27,7 @@ start()->
 
     ok=setup(),
     ok=start_cluster_test(),
-    ok=hw_conbee_app_test(),
-    % ok=deploy_appls_test(),
+    ok=deploy_appls_test(),
     
 
   
@@ -37,23 +36,6 @@ start()->
 
     ok.
 
-%% --------------------------------------------------------------------
-%% Function: available_hosts()
-%% Description: Based on hosts.config file checks which hosts are avaible
-%% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
-%% --------------------------------------------------------------------
-hw_conbee_app_test()->
-    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-    ApplSpec="hw_conbee",
-    HostSpec="c201",
-    oam:new_appl(ApplSpec,HostSpec,60*1000),
-    AllApps=oam:all_apps(),
-    io:format("AllApps ~p~n",[{AllApps,?MODULE,?FUNCTION_NAME}]),
-    
-    ok.
-    
-    
-    
 
 %% --------------------------------------------------------------------
 %% Function: available_hosts()
@@ -101,16 +83,23 @@ start_cluster_test()->
     ok=oam:new_db_info(),
     []=oam:new_connect_nodes(),
     {ok,PingNodes}=oam:ping_connect_nodes(),
-    [{pong,'prototype_c201_connect@c201'}]=lists:sort(PingNodes),
-       
+    [{pong,'c200_c201_connect@c200'},
+     {pong,'c200_c201_connect@c201'}
+    ]=lists:sort(PingNodes),
+    ok=oam:new_db_info(),
+    
     {PresentControllers,MissingControllers}=oam:new_controllers(),
-    ['1_prototype_c201_controller@c201']= lists:sort(PresentControllers),
+    [
+     '1_c200_c201_controller@c201',
+     '2_c200_c201_controller@c200'
+    ]= lists:sort(PresentControllers),
     []=MissingControllers,
    
     {PresentWorkers,MissingWorkers}=oam:new_workers(),
     [
-     '1_prototype_c201_worker@c201',
-     '2_prototype_c201_worker@c201'
+     '1_c200_c201_worker@c201','2_c200_c201_worker@c200',
+     '3_c200_c201_worker@c201','4_c200_c201_worker@c200',
+     '5_c200_c201_worker@c201','6_c200_c201_worker@c200'
     ]=lists:sort(PresentWorkers),
     []=MissingWorkers,
     
@@ -129,7 +118,7 @@ start_cluster_test()->
 %% Description: Based on hosts.config file checks which hosts are avaible
 %% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
 %% --------------------------------------------------------------------
--define(ClusterSpec,"prototype_c201").
+-define(ClusterSpec,"c200_c201").
 setup()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
     

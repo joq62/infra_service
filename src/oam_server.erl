@@ -17,6 +17,7 @@
 
 %% --------------------------------------------------------------------
 -define(HeartbeatTime,20*1000).
+-define(ApplTimeOut,2*5000).
 -define(LocalTypes,[oam,nodelog]).
 -define(TargetTypes,[nodelog]).
 
@@ -130,7 +131,12 @@ handle_call({deploy_appls},_From, State) ->
 
 
 handle_call({new_appl,ApplSpec,HostSpec},_From, State) ->
-    Reply= appl_server:new(ApplSpec,HostSpec,State#state.cluster_spec),
+    Reply= appl_server:new(ApplSpec,HostSpec,State#state.cluster_spec,?ApplTimeOut),
+    {reply, Reply, State};
+
+
+handle_call({new_appl,ApplSpec,HostSpec,TimeOut},_From, State) ->
+    Reply= appl_server:new(ApplSpec,HostSpec,State#state.cluster_spec,TimeOut),
     {reply, Reply, State};
 
 handle_call({delete_appl,AppSpec,PodNode},_From, State) ->

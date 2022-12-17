@@ -19,6 +19,7 @@
 
 -export([
 	 new_appl/2,
+	 new_appl/3,
 	 update_appl/3,
 	 delete_appl/2,
 	 deploy_appls/0,
@@ -52,6 +53,8 @@
 %% call
 new_appl(ApplSpec,HostSpec)->
     gen_server:call(?SERVER, {new_appl,ApplSpec,HostSpec},infinity).
+new_appl(ApplSpec,HostSpec,TimeOut)->
+    gen_server:call(?SERVER, {new_appl,ApplSpec,HostSpec,TimeOut},infinity).
 update_appl(ApplSpec,PodNode,HostSpec)->
     gen_server:call(?SERVER, {update_appl,ApplSpec,PodNode,HostSpec},infinity).
 delete_appl(ApplSpec,PodNode)->

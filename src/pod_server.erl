@@ -266,7 +266,9 @@ handle_cast(Msg, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
-handle_info({ssh_cm,_,{closed,0}}, State) ->
+
+
+handle_info({ssh_cm,_,_}, State) ->
     {noreply, State};
 
 handle_info(Info, State) ->
