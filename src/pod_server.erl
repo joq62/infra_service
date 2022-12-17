@@ -102,7 +102,7 @@ heartbeat()->
 %% --------------------------------------------------------------------
 init([]) -> 
     io:format("Started Server ~p~n",[{?MODULE,?LINE}]),
-    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,"Servere started"]),
+    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Servere started"]]),
     {ok, #state{cluster_spec=undefined,
 		present_controller_nodes=undefined,
 		missing_controller_nodes=undefined,
