@@ -95,6 +95,7 @@ heartbeat()->
 %% --------------------------------------------------------------------
 init([]) -> 
     io:format("Started Server ~p~n",[{?MODULE,?LINE}]),
+    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,"Servere started"]),
 
     {ok, #state{cluster_spec=undefined,
 		missing_connect_nodes=undefined,
@@ -298,7 +299,19 @@ create_connect_node(ClusterSpec,PodNode,NodesToConnect)->
     {ok,PodDir}=db_cluster_instance:read(pod_dir,ClusterSpec,PodNode),
     PaArgs=" -detached ",
     EnvArgs=" ",
-    ops_vm:ssh_create(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,NodesToConnect,?TimeOut).
+    Result= case ops_vm:ssh_create(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,NodesToConnect,?TimeOut) of
+		{error,Reason}->
+		    MsgAsList=binary_to_list(term_to_binary({error,Reason})),
+		    io:format("MsgAsList ~p~n",[MsgAsList]),
+		    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,"failed to create connec node "++MsgAsList]),
+		    {error,Reason};
+		{ok,ConnectNode,NodeDir,PingResult}->
+		    MsgAsList=binary_to_list(term_to_binary({ok,ConnectNode,NodeDir,PingResult})),
+		    io:format("MsgAsList ~p~n",[MsgAsList]),
+		    ok=rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,MsgAsList]),
+		    {ok,ConnectNode,NodeDir,PingResult}
+	    end,
+    Result.
 
 %% --------------------------------------------------------------------
 %% Function: terminate/2

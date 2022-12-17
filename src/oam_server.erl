@@ -97,6 +97,7 @@ init([]) ->
     ok=rd:trade_resources(),
     timer:sleep(3000),
     io:format("Started Server ~p~n",[{?MODULE,?LINE}]), 
+    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,"Servere started"]),
    
     {ok, #state{cluster_spec=ClusterSpec}}.   
  

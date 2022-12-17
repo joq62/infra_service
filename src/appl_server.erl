@@ -99,7 +99,7 @@ init([]) ->
 
     
     io:format("Started Server ~p~n",[{?MODULE,?LINE}]),
-
+    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,"Servere started"]),
     {ok, #state{
 	        cluster_spec=undefined}}.   
  
@@ -246,8 +246,10 @@ appl_del(ApplSpec,PodNode,ClusterSpec)->
 appl_new(ApplSpec,HostSpec,ClusterSpec)->
     Result=case pod_server:get_pod(ApplSpec,HostSpec) of
 	       {error,Reason}->
+		   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
 		   {error,Reason};
 	       []->
+		   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,[no_pods_available]}]),
 		   {error,[no_pods_available,?MODULE,?LINE]};
 	       {ok,PodNode}->
 		   {ok,PodDir}=db_cluster_instance:read(pod_dir,ClusterSpec,PodNode),
@@ -270,6 +272,7 @@ appl_new(ApplSpec,HostSpec,ClusterSpec)->
 		   rpc:call(PodNode,rd,trade_resources,[],5000),
 		   timer:sleep(2000),
 		   {atomic,ok}=db_appl_instance:create(ClusterSpec,ApplSpec,PodNode,HostSpec,{date(),time()}),
+		   rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["application created ",ApplSpec,PodNode]]),
 		   {ok,PodNode}
 	   end,
     Result.

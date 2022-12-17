@@ -102,7 +102,7 @@ heartbeat()->
 %% --------------------------------------------------------------------
 init([]) -> 
     io:format("Started Server ~p~n",[{?MODULE,?LINE}]),
-
+    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,"Servere started"]),
     {ok, #state{cluster_spec=undefined,
 		present_controller_nodes=undefined,
 		missing_controller_nodes=undefined,
@@ -366,7 +366,6 @@ restart_pod(ClusterSpec,PodNode)->
     
     PaArgs=" -detached ",
     EnvArgs=" ",
-    io:format("INFO: restarts  pod ~p~n",[{PodNode, ?MODULE,?LINE}]),
     create_pod_node(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,?TimeOut).
 
 
@@ -398,10 +397,16 @@ create_controller_pod(ClusterSpec,N,[HostSpec|T],Acc) ->
     db_cluster_instance:create(ClusterSpec,Type,PodName,PodNode,PodDir,HostSpec,Status),
     PaArgs=" -detached ",
     EnvArgs=" ",
-    R=create_pod_node(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,?TimeOut),
+    Result=case create_pod_node(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,?TimeOut) of
+	       {error,Reason}->
+		   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Failed to create ",PodNode ,Reason]]),
+		   {error,Reason};
+	       {ok,PodNode,NodeDir,PingResult}->
+		   rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Controller created ",PodNode]]),
+		   {ok,PodNode,NodeDir,PingResult} 
+	   end,
     RotatedHostSpecList=lists:append(T,[HostSpec]),
-    io:format("INFO: Create controller pod ~p~n",[{PodNode, ?MODULE,?LINE}]),
-    create_controller_pod(ClusterSpec,N-1,RotatedHostSpecList,[R|Acc]).
+    create_controller_pod(ClusterSpec,N-1,RotatedHostSpecList,[Result|Acc]).
     
 %% --------------------------------------------------------------------
 %% Function: terminate/2
@@ -430,10 +435,16 @@ create_worker_pod(ClusterSpec,N,[HostSpec|T],Acc) ->
     db_cluster_instance:create(ClusterSpec,Type,PodName,PodNode,PodDir,HostSpec,Status),
     PaArgs=" -detached ",
     EnvArgs=" ",
-    R=create_pod_node(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,?TimeOut),
+    Result=case create_pod_node(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,?TimeOut) of
+	       {error,Reason}->
+		   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Failed to create ",PodNode ,Reason]]),
+		   {error,Reason};
+	       {ok,PodNode,NodeDir,PingResult}->
+		   rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Worker created ",PodNode]]),
+		   {ok,PodNode,NodeDir,PingResult} 
+	   end,
     RotatedHostSpecList=lists:append(T,[HostSpec]),
-    io:format("INFO: Create worker pod ~p~n",[{PodNode, ?MODULE,?LINE}]),
-    create_worker_pod(ClusterSpec,N-1,RotatedHostSpecList,[R|Acc]).
+    create_worker_pod(ClusterSpec,N-1,RotatedHostSpecList,[Result|Acc]).
     
 %% --------------------------------------------------------------------
 %% Function: terminate/2
@@ -444,8 +455,8 @@ create_pod_node(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,TimeO
     case ops_vm:ssh_create(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,TimeOut) of
 	{error,Reason}->
 	    {error,Reason};
-	  {ok,PodNode,_,_}->
-	     ApplSpec="pod_app",
+	  {ok,PodNode,NodeDir,PingResult}->
+	    ApplSpec="pod_app",
 	    {ok,PodApplGitPath}=db_appl_spec:read(gitpath,ApplSpec),
 	    ApplDir=filename:join([PodDir,ApplSpec]),
 	    
@@ -464,5 +475,5 @@ create_pod_node(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,TimeO
 	    [rpc:call(PodNode,rd,add_target_resource_type,[TargetType],5000)||TargetType<-TargetTypeList],
 	    rpc:call(PodNode,rd,trade_resources,[],5000),
 	    timer:sleep(2000),
-	    ok
+	    {ok,PodNode,NodeDir,PingResult}
     end.
