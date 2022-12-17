@@ -65,6 +65,8 @@ ssh_create(HostName,NodeName,NodeDir,Cookie,PaArgs,EnvArgs,NodesToConnect,TimeOu
 		       {badrpc,Reason}->
 			   ops_ssh:delete_dir(HostName,NodeDir),
 			   {error,[badrpc,Reason,?MODULE,?FUNCTION_NAME,?LINE]};
+		       {error,Reason}->
+			   {error,[Reason,?MODULE,?FUNCTION_NAME,?LINE]};
 		       ok->
 			   PingResult=[{rpc:call(ConnectNode,net_adm,ping,[NodeX],2000),NodeX}||NodeX<-NodesToConnect],
 			   {ok,ConnectNode,NodeDir,PingResult}
