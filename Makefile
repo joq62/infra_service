@@ -14,7 +14,8 @@ all:
 	cp _build/default/lib/*/ebin/* ebin;
 	rm -rf _build;
 	rm -rf tests_ebin;
-	git add -f *;
+	rm -rf ebin;
+	git add *
 	git commit -m $(m);
 	git push;
 	echo Ok there you go!
