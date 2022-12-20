@@ -3,14 +3,14 @@
 %% @end
 %%%-------------------------------------------------------------------
 
--module(oam_app).
+-module(infra_service_app_app). 
 
 -behaviour(application).
 
 -export([start/2, stop/1]).
 
 start(_StartType, _StartArgs) ->
-    oam_sup:start_link().
+    infra_service_app_sup:start_link().
 
 stop(_State) ->
     ok.

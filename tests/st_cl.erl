@@ -87,7 +87,7 @@ start_cluster_test()->
 setup()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
     
-    ok=application:set_env([{oam,[{cluster_spec,?ClusterSpec}]}]),
+    ok=application:set_env([{infra_service_app,[{cluster_spec,?ClusterSpec}]}]),
     
     
     {ok,_}=db_etcd_server:start(),
@@ -103,7 +103,8 @@ setup()->
     {ok,_}=connect_server:start(),
     {ok,_}=appl_server:start(),
     {ok,_}=pod_server:start(),
-    ok=application:start(oam),
+    {ok,_}=oam_server:start(),
+    ok=application:start(infra_service_app),
     timer:sleep(3000),
 
     ok.

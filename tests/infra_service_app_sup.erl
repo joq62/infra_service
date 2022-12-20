@@ -3,7 +3,7 @@
 %% @end
 %%%-------------------------------------------------------------------
 
--module(oam_sup).
+-module(infra_service_app_sup). 
 
 -behaviour(supervisor).
 
@@ -29,8 +29,8 @@ init([]) ->
     SupFlags = #{strategy => one_for_all,
                  intensity => 0,
                  period => 1},
-     ChildSpecs = [#{id=>oam,
-		    start=>{oam_server,start,[]}}
+     ChildSpecs = [#{id=>infra_service_app,
+		    start=>{infra_service_app_server,start,[]}}
 		 		   
 		 ],
     {ok, {SupFlags, ChildSpecs}}.

@@ -69,7 +69,7 @@ stop()-> gen_server:call(?MODULE, {stop},infinity).
 init([]) -> 
     
   
-    {ok,ClusterSpec}=application:get_env(cluster_spec),
+    {ok,ClusterSpec}=application:get_env(infra_service_app,cluster_spec),
     {ok,ClusterDir}=db_cluster_spec:read(dir,ClusterSpec),
     % Install nodelog
     LogDir="log_dir",
@@ -89,7 +89,6 @@ init([]) ->
 
     {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
     erlang:set_cookie(node(),list_to_atom(Cookie)),
-
 
 
     % Trade resources
@@ -124,6 +123,15 @@ init([]) ->
    % ok=rpc:call(node(),nodelog,create,[LogFile1],5000),
  %   Reply=ok,
   %  {reply, Reply, State};
+
+handle_call({is_cluster_deployed},_From, State) ->
+    Reply=glurk_not_implmented,
+    {reply, Reply, State};
+
+handle_call({delete_cluster},_From, State) ->
+    Reply=glurk_not_implemented,
+    {reply, Reply, State};
+
 
 handle_call({deploy_appls},_From, State) ->
     Reply=appl_server:deploy_appls(State#state.cluster_spec),
@@ -174,14 +182,6 @@ handle_call({ping_connect_nodes},_From, State) ->
     ConnectNodes=db_cluster_instance:nodes(connect,State#state.cluster_spec),
     PingConnectNodes=[{net_adm:ping(Node),Node}||Node<-ConnectNodes],
     Reply={ok,PingConnectNodes},
-    {reply, Reply, State};
-
-handle_call({is_cluster_deployed},_From, State) ->
-    Reply=glurk_not_implmented,
-    {reply, Reply, State};
-
-handle_call({delete_cluster},_From, State) ->
-    Reply=glurk_not_implemented,
     {reply, Reply, State};
 
 
