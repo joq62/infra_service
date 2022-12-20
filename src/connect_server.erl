@@ -95,7 +95,7 @@ heartbeat()->
 %% --------------------------------------------------------------------
 init([]) -> 
     io:format("Started Server ~p~n",[{?MODULE,?LINE}]),
-    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,"Servere started"]),
+    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Servere started"]]),
 
     {ok, #state{cluster_spec=undefined,
 		missing_connect_nodes=undefined,
@@ -148,26 +148,28 @@ handle_cast({start_monitoring,ClusterSpec}, State) ->
 
 handle_cast({heartbeat}, State) ->
     NewPresentConnectNodes=present_connect_nodes(State#state.cluster_spec),
-    NewMissingConnectNodes=missing_connect_nodes(State#state.cluster_spec),
-   
-    
-    NoChangeStatus=lists:sort(NewPresentConnectNodes) =:= lists:sort(State#state.present_connect_nodes),
-    case NoChangeStatus of
-	false->
-	    io:format("INFO: cluster state changed  ~p~n",[{date(),time()}]),  
-	   
-	    io:format("INFO:PresentConnectNodes ~p~n",[State#state.present_connect_nodes]),   
-	    io:format("INFO:MissingConnectNodes ~p~n",[State#state.missing_connect_nodes]),
-	  
-	    io:format("INFO:NewPresentConnectNodes ~p~n",[NewPresentConnectNodes]),   
-	    io:format("INFO:NewMissingConnectNodes ~p~n",[NewMissingConnectNodes]);
-	true->
-	    ok
+    Started=[Node||Node<-NewPresentConnectNodes,
+		   false==lists:member(Node,State#state.present_connect_nodes)],
+    case Started of
+	[]->
+	    no_change;
+		Started ->
+	    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Started connect nodes : ",Started]])
     end,
-
+    
+    NewMissingConnectNodes=missing_connect_nodes(State#state.cluster_spec),
+    Stopped=[Node||Node<-NewMissingConnectNodes,
+		   false==lists:member(Node,State#state.missing_connect_nodes)],
+    case Stopped of
+	[]->
+	    no_change;
+	Stopped ->
+	    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Stopped connect nodes : ",Stopped]])
+    end,
+    
     NewState=State#state{present_connect_nodes=NewPresentConnectNodes,
 			 missing_connect_nodes=NewMissingConnectNodes},
-  
+    
     spawn(fun()->hbeat(State#state.cluster_spec) end),
     {noreply, NewState};
 
@@ -288,9 +290,7 @@ connect_nodes(ClusterSpec)->
     [create_connect_node(ClusterSpec,PodNode,NodesToConnect)||PodNode<-MissingConnectNodes].
     
 create_connect_node(ClusterSpec,PodNode,NodesToConnect)->
-    io:format("INFO: create new/restart connect_node  ~p~n",[{date(),time()}]), 
-    io:format("INFO: Cluster and PodNode   ~p~n",[{ClusterSpec,PodNode}]),  
-    
+ 
     {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
     {ok,HostSpec}=db_cluster_instance:read(host_spec,ClusterSpec,PodNode),
     {ok,HostName}=db_host_spec:read(hostname,HostSpec),
@@ -301,14 +301,10 @@ create_connect_node(ClusterSpec,PodNode,NodesToConnect)->
     EnvArgs=" ",
     Result= case ops_vm:ssh_create(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,NodesToConnect,?TimeOut) of
 		{error,Reason}->
-		    MsgAsList=binary_to_list(term_to_binary({error,Reason})),
-		    io:format("MsgAsList ~p~n",[MsgAsList]),
-		    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,"failed to create connec node "++MsgAsList]),
+		    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["failed to create connect node ",error,Reason]]),
 		    {error,Reason};
 		{ok,ConnectNode,NodeDir,PingResult}->
-		    MsgAsList=binary_to_list(term_to_binary({ok,ConnectNode,NodeDir,PingResult})),
-		    io:format("MsgAsList ~p~n",[MsgAsList]),
-		    ok=rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,MsgAsList]),
+		    ok=rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Started connect node: ",ConnectNode,NodeDir]]),
 		    {ok,ConnectNode,NodeDir,PingResult}
 	    end,
     Result.

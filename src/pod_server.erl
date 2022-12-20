@@ -195,13 +195,10 @@ handle_cast({start_monitoring,ClusterSpec}, State) ->
 
     PresentControllerNodes=present_controller_nodes(ClusterSpec),
     MissingControllerNodes=missing_controller_nodes(ClusterSpec),
-    io:format("INFO:PresentControllerNodes ~p~n",[PresentControllerNodes]),   
-    io:format("INFO:MissingControllerNodes ~p~n",[MissingControllerNodes]),
-    
+       
     PresentWorkerNodes=present_worker_nodes(ClusterSpec),
     MissingWorkerNodes=missing_worker_nodes(ClusterSpec),
-    io:format("INFO:PresentWorkerNodes ~p~n",[PresentWorkerNodes]),   
-    io:format("INFO:MissingWorkerNodes ~p~n",[MissingWorkerNodes]),
+  
 
     NewState=State#state{cluster_spec=ClusterSpec,
 			 present_controller_nodes=PresentControllerNodes,
@@ -216,37 +213,45 @@ handle_cast({start_monitoring,ClusterSpec}, State) ->
 handle_cast({heartbeat}, State) ->
 
     NewPresentControllerNodes=present_controller_nodes(State#state.cluster_spec),
+    StartedControllers=[Node||Node<-NewPresentControllerNodes,
+			      false==lists:member(Node,State#state.present_controller_nodes)],
+    case StartedControllers of
+	[]->
+	    no_change;
+	StartedControllers ->
+	    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Started Controller nodes : ",StartedControllers]])
+    end,
+    
     NewMissingControllerNodes=missing_controller_nodes(State#state.cluster_spec),
-    NewPresentWorkerNodes=present_worker_nodes(State#state.cluster_spec),
-    NewMissingWorkerNodes=missing_worker_nodes(State#state.cluster_spec),
-  
+    StoppedControllers=[Node||Node<-NewMissingControllerNodes,
+			      false==lists:member(Node,State#state.missing_controller_nodes)],
+    case StoppedControllers of
+	[]->
+	    no_change;
+	StoppedControllers ->
+	    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Stopped Controller nodes : ",StoppedControllers]])
+    end,
 
-    NoChangeStatusController=lists:sort(NewPresentControllerNodes) =:= lists:sort(State#state.present_controller_nodes),
-    case NoChangeStatusController of
-	false->
-	    io:format("INFO: controller state changed  ~p~n",[{date(),time()}]),  
-	   
-	    io:format("INFO:PresentControllerNodes ~p~n",[State#state.present_controller_nodes]),   
-	    io:format("INFO:MissingControllerNodes ~p~n",[State#state.missing_controller_nodes]),
-	  
-	    io:format("INFO:NewPresentControllerNodes ~p~n",[NewPresentControllerNodes]),   
-	    io:format("INFO:NewMissingControllerNodes ~p~n",[NewMissingControllerNodes]);
-	true->
-	    ok
+    NewPresentWorkerNodes=present_worker_nodes(State#state.cluster_spec),
+    StartedWorkers=[Node||Node<-NewPresentWorkerNodes,
+			  false==lists:member(Node,State#state.present_worker_nodes)],
+    case StartedWorkers of
+	[]->
+	    no_change;
+	StartedWorkers ->
+	    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Started Worker nodes : ",StartedWorkers]])
     end,
-    NoChangeStatusWorker=lists:sort(NewPresentWorkerNodes)=:=lists:sort(State#state.present_worker_nodes),
-    case NoChangeStatusWorker of
-	false->
-	    io:format("INFO: worker state changed  ~p~n",[{date(),time()}]),  
-	    
-	    io:format("INFO:PresentWorkerNodes ~p~n",[State#state.present_worker_nodes]),   
-	    io:format("INFO:MissingWorkerNodes ~p~n",[State#state.missing_worker_nodes]),
-	    
-	    io:format("INFO:NewPresentWorkerNodes ~p~n",[NewPresentWorkerNodes]),   
-	    io:format("INFO:NewMissingWorkerNodes ~p~n",[NewMissingWorkerNodes]);
-	true->
-	    ok
+    
+    NewMissingWorkerNodes=missing_worker_nodes(State#state.cluster_spec),
+    StoppedWorkers=[Node||Node<-NewMissingControllerNodes,
+			  false==lists:member(Node,State#state.missing_controller_nodes)],
+    case StoppedWorkers of
+	[]->
+	    no_change;
+	StoppedWorkers ->
+	    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Stopped worker nodes : ",StoppedWorkers]])
     end,
+
 
     NewState=State#state{present_controller_nodes=NewPresentControllerNodes,
 			 missing_controller_nodes=NewMissingControllerNodes,

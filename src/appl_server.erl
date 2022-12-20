@@ -168,32 +168,33 @@ handle_call(Request, From, State) ->
 handle_cast({start_monitoring,ClusterSpec}, State) ->
     Present=present(ClusterSpec),
     Missing=missing(ClusterSpec),
-    io:format("INFO:Present ~p~n",[Present]),   
-    io:format("INFO:Missing ~p~n",[Missing]),
     NewState=State#state{cluster_spec=ClusterSpec,
 			 present=Present,
 			 missing=Missing		
 			},
-
+    
     spawn(fun()->hbeat(ClusterSpec) end),
     {noreply, NewState};
 
 handle_cast({heartbeat}, State) ->
-
     NewPresent=present(State#state.cluster_spec),
+    Started=[{AppSpec,PodNode,App}||{AppSpec,PodNode,App}<-NewPresent,
+		   false==lists:member({AppSpec,PodNode,App},State#state.present)],
+    case Started of
+	[]->
+	    no_change;
+		Started ->
+	    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Started applications : ",Started]])
+    end,
+    
     NewMissing=missing(State#state.cluster_spec),
-    NoChangeStatusController=lists:sort(NewPresent) =:= lists:sort(State#state.present),
-    case NoChangeStatusController of
-	false->
-	    io:format("INFO: state changed  ~p~n",[{date(),time()}]),  
-	   
-	    io:format("INFO:Present ~p~n",[State#state.present]),   
-	    io:format("INFO:Missing ~p~n",[State#state.missing]),
-	  
-	    io:format("INFO:NewPresent ~p~n",[NewPresent]),   
-	    io:format("INFO:NewMissing ~p~n",[NewMissing]);
-	true->
-	    ok
+    Stopped=[{AppSpec,PodNode,App}||{AppSpec,PodNode,App}<-NewMissing,
+		   false==lists:member({AppSpec,PodNode,App},State#state.missing)],
+    case Stopped of
+	[]->
+	    no_change;
+	Stopped ->
+	    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Stopped applications : ",Stopped]])
     end,
     NewState=State#state{present=NewPresent,
 			 missing=NewMissing},
@@ -346,7 +347,7 @@ present(ClusterSpec)->
 			 true==rpc:call(node(),lists,keymember,[App,1,rpc:call(PodNode,application,which_applications,[],2000)])].
 missing(ClusterSpec)->
     AppPodList=[{db_appl_spec:read(app,AppSpec),PodNode,AppSpec}||{AppSpec,PodNode}<-db_appl_instance:get_pod_appl_specs(ClusterSpec)],
-    [{AppSpec,PodNode}||{{ok,App},PodNode,AppSpec}<-AppPodList, 
+    [{AppSpec,PodNode,App}||{{ok,App},PodNode,AppSpec}<-AppPodList, 
 			true/=rpc:call(node(),lists,keymember,[App,1,rpc:call(PodNode,application,which_applications,[],2000)])].
 
 
@@ -367,7 +368,7 @@ hbeat(ClusterSpec)->
 wanted_state(ClusterSpec)->
       % {AppSpec,PodNode}
     
-    MissingPresentNodes=[{ApplSpec,PodNode}||{ApplSpec,PodNode}<-missing(ClusterSpec),
+    MissingPresentNodes=[{ApplSpec,PodNode}||{ApplSpec,PodNode,_App}<-missing(ClusterSpec),
 					     pong==net_adm:ping(PodNode)],
     [rpc:call(node(),?MODULE,restart_appl,[ClusterSpec,{ApplSpec,PodNode}],10*1000)||{ApplSpec,PodNode}<-MissingPresentNodes],
  %   io:format(" ~p~n",[{R,?MODULE,?FUNCTION_NAME}]),

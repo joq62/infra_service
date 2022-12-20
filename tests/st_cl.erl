@@ -65,8 +65,8 @@ start_cluster_test()->
     ]=lists:sort(PresentWorkers),
     []=MissingWorkers,
 
-    Nodes=[{Node,rpc:call(Node,erlang,nodes,[],2000)}||Node<-nodes()],
-    io:format(" Nodes ~p~n",[{Nodes,?MODULE,?FUNCTION_NAME}]),
+  %  Nodes=[{Node,rpc:call(Node,erlang,nodes,[],2000)}||Node<-nodes()],
+   % io:format(" Nodes ~p~n",[{Nodes,?MODULE,?FUNCTION_NAME}]),
     
   
     ok.

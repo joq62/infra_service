@@ -62,14 +62,14 @@ check_present_missing()->
    
   %  io:format("Apps ~p~n",[[rpc:call(Node,application,which_applications,[],2000)||Node<-nodes()]]),
     [{"math",PodNode,math}]=appl_server:present_apps(?ClusterSpec),
-    io:format("Presents ~p~n",[{appl_server:present_apps(?ClusterSpec),?FUNCTION_NAME,?LINE}]),
-    io:format("Missing ~p~n",[{appl_server:missing_apps(?ClusterSpec),?FUNCTION_NAME,?LINE}]),
+ %   io:format("Presents ~p~n",[{appl_server:present_apps(?ClusterSpec),?FUNCTION_NAME,?LINE}]),
+  %  io:format("Missing ~p~n",[{appl_server:missing_apps(?ClusterSpec),?FUNCTION_NAME,?LINE}]),
 
     rpc:call(PodNode,application,stop,[math],5000),
     rpc:call(PodNode,application,unload,[math],5000),
 
-    io:format("Presents ~p~n",[{appl_server:present_apps(?ClusterSpec),?FUNCTION_NAME,?LINE}]),
-    io:format("Missing ~p~n",[{appl_server:missing_apps(?ClusterSpec),?FUNCTION_NAME,?LINE}]),
+  %  io:format("Presents ~p~n",[{appl_server:present_apps(?ClusterSpec),?FUNCTION_NAME,?LINE}]),
+  %  io:format("Missing ~p~n",[{appl_server:missing_apps(?ClusterSpec),?FUNCTION_NAME,?LINE}]),
     
     
     
