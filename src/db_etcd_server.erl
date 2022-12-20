@@ -65,6 +65,7 @@ stop()-> gen_server:call(?MODULE, {stop},infinity).
 init([]) ->
     IntialNode=node(),
     lib_db_etcd:dynamic_install_start(IntialNode),
+    ok=do_install(),
     
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
   
@@ -85,40 +86,7 @@ init([]) ->
 
 handle_call({install},_From, State) ->
 
-  %  io:format("DEBUG  ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-
-    ok=db_cluster_spec:create_table(),
-    ClusterSpec=db_cluster_spec:git_clone_load(),
-    Ok_ClusterSpec=[X||{ok,X}<-ClusterSpec],
-    Err_ClusterSpec=[X||{error,X}<-ClusterSpec],
-
-    ok=db_host_spec:create_table(),
-    HostSpec=db_host_spec:git_clone_load(),
-    Ok_HostSpec=[X||{ok,X}<-HostSpec],
-    Err_HostSpec=[X||{error,X}<-HostSpec],
-
-    ok=db_cluster_instance:create_table(),
-
-    ok=db_appl_spec:create_table(),
-    ApplSpec=db_appl_spec:git_clone_load(),
-    Ok_ApplSpec=[X||{ok,X}<-ApplSpec],
-    Err_ApplSpec=[X||{error,X}<-ApplSpec],
-
-    ok=db_appl_deployment:create_table(),
-    ApplDeployment=db_appl_deployment:git_clone_load(),
-    Ok_ApplDeployment=[X||{ok,X}<-ApplDeployment],
-    Err_ApplDeployment=[X||{error,X}<-ApplDeployment],
-
-    ok=db_appl_instance:create_table(),
-    
-
-   
-
-    Reply=[
-	   {cluster_spec,Ok_ClusterSpec,Err_ClusterSpec},
-	   {host_spec,Ok_HostSpec,Err_HostSpec},
-	   {appl_spec,Ok_ApplSpec,Err_ApplSpec},
-	   {appl_deployment,Ok_ApplDeployment,Err_ApplDeployment}],
+    Reply=do_install(),
 
     {reply, Reply, State};
 
@@ -177,3 +145,36 @@ code_change(_OldVsn, State, _Extra) ->
 %% --------------------------------------------------------------------
 %%% Internal functions
 %% --------------------------------------------------------------------
+%% --------------------------------------------------------------------
+%% Function: handle_info/2
+%% Description: Handling all non call/cast messages
+%% Returns: {noreply, State}          |
+%%          {noreply, State, Timeout} |
+%%          {stop, Reason, State}            (terminate/2 is called)
+%% --------------------------------------------------------------------
+do_install()->
+    ok=db_cluster_spec:create_table(),
+    ClusterSpec=db_cluster_spec:git_clone_load(),
+    Ok_ClusterSpec=[X||{ok,X}<-ClusterSpec],
+    Err_ClusterSpec=[X||{error,X}<-ClusterSpec],
+
+    ok=db_host_spec:create_table(),
+    HostSpec=db_host_spec:git_clone_load(),
+    Ok_HostSpec=[X||{ok,X}<-HostSpec],
+    Err_HostSpec=[X||{error,X}<-HostSpec],
+
+    ok=db_cluster_instance:create_table(),
+
+    ok=db_appl_spec:create_table(),
+    ApplSpec=db_appl_spec:git_clone_load(),
+    Ok_ApplSpec=[X||{ok,X}<-ApplSpec],
+    Err_ApplSpec=[X||{error,X}<-ApplSpec],
+
+    ok=db_appl_deployment:create_table(),
+    ApplDeployment=db_appl_deployment:git_clone_load(),
+    Ok_ApplDeployment=[X||{ok,X}<-ApplDeployment],
+    Err_ApplDeployment=[X||{error,X}<-ApplDeployment],
+
+    ok=db_appl_instance:create_table(),
+    
+    ok.
