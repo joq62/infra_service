@@ -465,6 +465,8 @@ create_pod_node(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,TimeO
 	{error,Reason}->
 	    {error,Reason};
 	  {ok,PodNode,NodeDir,PingResult}->
+	    pong=net_adm:ping(PodNode),
+
 	    ApplSpec="pod_app",
 	    {ok,PodApplGitPath}=db_appl_spec:read(gitpath,ApplSpec),
 	    ApplDir=filename:join([PodDir,ApplSpec]),
