@@ -321,6 +321,7 @@ create_connect_node(ClusterSpec,PodNode,NodesToConnect)->
 		    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["failed to create connect node ",error,Reason]]),
 		    {error,Reason};
 		{ok,ConnectNode,NodeDir,PingResult}->
+		    
 		    pong=net_adm:ping(ConnectNode),
 		    ok=rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Started connect node: ",ConnectNode,NodeDir]]),
 		    {ok,ConnectNode,NodeDir,PingResult}

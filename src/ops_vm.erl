@@ -56,6 +56,9 @@ ssh_create(HostName,NodeName,NodeDir,Cookie,PaArgs,EnvArgs,NodesToConnect)->
     ssh_create(HostName,NodeName,NodeDir,Cookie,PaArgs,EnvArgs,NodesToConnect,?TimeOut).
 ssh_create(HostName,NodeName,NodeDir,Cookie,PaArgs,EnvArgs,NodesToConnect,TimeOut)->
     %Create erlang vm
+ %   io:format("HostName ~p~n",[{HostName,?MODULE,?FUNCTION_NAME}]),
+ %   io:format("NodeName ~p~n",[{NodeName,?MODULE,?FUNCTION_NAME}]),
+ %   io:format("NodeDir ~p~n",[{NodeDir,?MODULE,?FUNCTION_NAME}]),
     ops_ssh:delete_dir(HostName,NodeDir),
     Result=case ops_ssh:create(HostName,NodeName,Cookie,PaArgs,EnvArgs) of
 	       {error,Reason}->
