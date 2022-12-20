@@ -97,6 +97,8 @@ handle_call({install},_From, State) ->
     Ok_HostSpec=[X||{ok,X}<-HostSpec],
     Err_HostSpec=[X||{error,X}<-HostSpec],
 
+    ok=db_cluster_instance:create_table(),
+
     ok=db_appl_spec:create_table(),
     ApplSpec=db_appl_spec:git_clone_load(),
     Ok_ApplSpec=[X||{ok,X}<-ApplSpec],
@@ -106,6 +108,9 @@ handle_call({install},_From, State) ->
     ApplDeployment=db_appl_deployment:git_clone_load(),
     Ok_ApplDeployment=[X||{ok,X}<-ApplDeployment],
     Err_ApplDeployment=[X||{error,X}<-ApplDeployment],
+
+    ok=db_appl_instance:create_table(),
+    
 
    
 
