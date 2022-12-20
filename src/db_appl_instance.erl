@@ -116,6 +116,7 @@ read(ClusterInstance,PodNode)->
 		     X#?RECORD.cluster_instance==ClusterInstance,
 		     X#?RECORD.pod_node==PodNode])),
     [{X#?RECORD.cluster_instance,X#?RECORD.appl_spec,X#?RECORD.pod_node,X#?RECORD.host_spec,X#?RECORD.status}||X<-Z].
+
    
  
 

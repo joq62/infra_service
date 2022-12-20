@@ -27,7 +27,9 @@ start()->
 
     ok=setup(),
        
-    ok=oam_tests:start(),
+    ok=st_cl:start(),
+    ok=appl_tests:start(),
+    
     
    
    

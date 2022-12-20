@@ -17,6 +17,7 @@
 
 %% --------------------------------------------------------------------
 -define(HeartbeatTime,20*1000).
+-define(TimeOut,10*1000).
 
 %% External exports
 -export([
@@ -27,7 +28,10 @@
 	 missing_apps/1,
 	 
 	 initiate/1,
+	 start_monitoring/1,
 	 heartbeat/0,
+	 wanted_state/1,
+	 restart_appl/2,
 	 ping/0
 	]).
 
@@ -46,7 +50,9 @@
 
 %%-------------------------------------------------------------------
 -record(state,{
-	      cluster_spec
+	      cluster_spec,
+	       present,
+	       missing
 	      }).
 
 
@@ -78,6 +84,9 @@ ping() ->
     gen_server:call(?MODULE, {ping}).
 
 %% cast
+start_monitoring(ClusterSpec)->
+    gen_server:cast(?MODULE, {start_monitoring,ClusterSpec}).
+
 heartbeat()-> 
     gen_server:cast(?MODULE, {heartbeat}).
 initiate(InstanceId)-> 
@@ -101,7 +110,9 @@ init([]) ->
     io:format("Started Server ~p~n",[{?MODULE,?LINE}]),
     rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,"Servere started"]),
     {ok, #state{
-	        cluster_spec=undefined}}.   
+	    cluster_spec=undefined,
+	    present=undefined,
+	    missing=undefined}}.   
  
 
 %% --------------------------------------------------------------------
@@ -125,9 +136,6 @@ handle_call({delete,ApplSpec,PodNode,ClusterSpec},_From, State) ->
 handle_call({deploy_appls,ClusterSpec},_From, State) ->
     Reply=deploy(ClusterSpec),
       {reply, Reply, State};
-
-
-
 
 handle_call({present_apps,ClusterSpec},_From, State) ->
     Reply=present(ClusterSpec),
@@ -157,6 +165,41 @@ handle_call(Request, From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
+handle_cast({start_monitoring,ClusterSpec}, State) ->
+    Present=present(ClusterSpec),
+    Missing=missing(ClusterSpec),
+    io:format("INFO:Present ~p~n",[Present]),   
+    io:format("INFO:Missing ~p~n",[Missing]),
+    NewState=State#state{cluster_spec=ClusterSpec,
+			 present=Present,
+			 missing=Missing		
+			},
+
+    spawn(fun()->hbeat(ClusterSpec) end),
+    {noreply, NewState};
+
+handle_cast({heartbeat}, State) ->
+
+    NewPresent=present(State#state.cluster_spec),
+    NewMissing=missing(State#state.cluster_spec),
+    NoChangeStatusController=lists:sort(NewPresent) =:= lists:sort(State#state.present),
+    case NoChangeStatusController of
+	false->
+	    io:format("INFO: state changed  ~p~n",[{date(),time()}]),  
+	   
+	    io:format("INFO:Present ~p~n",[State#state.present]),   
+	    io:format("INFO:Missing ~p~n",[State#state.missing]),
+	  
+	    io:format("INFO:NewPresent ~p~n",[NewPresent]),   
+	    io:format("INFO:NewMissing ~p~n",[NewMissing]);
+	true->
+	    ok
+    end,
+    NewState=State#state{present=NewPresent,
+			 missing=NewMissing},
+  
+    spawn(fun()->hbeat(State#state.cluster_spec) end),
+    {noreply, NewState};
 
 
 handle_cast(Msg, State) ->
@@ -196,6 +239,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% --------------------------------------------------------------------
 %%% Internal functions
 %% --------------------------------------------------------------------
+
 %% --------------------------------------------------------------------
 %% Function: terminate/2
 %% Description: Shutdown the server
@@ -298,12 +342,71 @@ appl_new(ApplSpec,HostSpec,ClusterSpec,TimeOut)->
 %% --------------------------------------------------------------------
 present(ClusterSpec)->
     AppPodList=[{db_appl_spec:read(app,AppSpec),PodNode,AppSpec}||{AppSpec,PodNode}<-db_appl_instance:get_pod_appl_specs(ClusterSpec)],
-    [{AppSpec,PodNode}||{{ok,App},PodNode,AppSpec}<-AppPodList, 
-			 pong==rpc:call(PodNode,App,ping,[],2000)].
+    [{AppSpec,PodNode,App}||{{ok,App},PodNode,AppSpec}<-AppPodList, 
+			 true==rpc:call(node(),lists,keymember,[App,1,rpc:call(PodNode,application,which_applications,[],2000)])].
 missing(ClusterSpec)->
     AppPodList=[{db_appl_spec:read(app,AppSpec),PodNode,AppSpec}||{AppSpec,PodNode}<-db_appl_instance:get_pod_appl_specs(ClusterSpec)],
     [{AppSpec,PodNode}||{{ok,App},PodNode,AppSpec}<-AppPodList, 
-			 pong/=rpc:call(PodNode,App,ping,[],2000)].
+			true/=rpc:call(node(),lists,keymember,[App,1,rpc:call(PodNode,application,which_applications,[],2000)])].
+
+
+%% --------------------------------------------------------------------
+%% Function: terminate/2
+%% Description: Shutdown the server
+%% Returns: any (ignored by gen_server)
+%% --------------------------------------------------------------------
+hbeat(ClusterSpec)->
+    timer:sleep(?HeartbeatTime),
+    rpc:call(node(),?MODULE,wanted_state,[ClusterSpec],30*1000), 
+    rpc:cast(node(),?MODULE,heartbeat,[]).
+%% --------------------------------------------------------------------
+%% Function: terminate/2
+%% Description: Shutdown the server
+%% Returns: any (ignored by gen_server)
+%% --------------------------------------------------------------------
+wanted_state(ClusterSpec)->
+      % {AppSpec,PodNode}
+    
+    MissingPresentNodes=[{ApplSpec,PodNode}||{ApplSpec,PodNode}<-missing(ClusterSpec),
+					     pong==net_adm:ping(PodNode)],
+    [rpc:call(node(),?MODULE,restart_appl,[ClusterSpec,{ApplSpec,PodNode}],10*1000)||{ApplSpec,PodNode}<-MissingPresentNodes],
+ %   io:format(" ~p~n",[{R,?MODULE,?FUNCTION_NAME}]),
+    ok.
+    
+    
+ %% --------------------------------------------------------------------
+%% Function: terminate/2
+%% Description: Shutdown the server
+%% Returns: any (ignored by gen_server)
+%% --------------------------------------------------------------------
+restart_appl(ClusterSpec,{ApplSpec,PodNode})->
+    {ok,HostSpec}=db_appl_instance:read(host_spec,ClusterSpec,PodNode),
+    {ok,PodDir}=db_cluster_instance:read(pod_dir,ClusterSpec,PodNode),
+    {ok,PodApplGitPath}=db_appl_spec:read(gitpath,ApplSpec),
+    ApplDir=filename:join([PodDir,ApplSpec]),
+		   %% set application envs
+    {ok,ApplicationConfig}=db_host_spec:read(application_config,HostSpec),  
+    _SetEnvResult=[rpc:call(PodNode,application,set_env,[[Config]],5000)||Config<-ApplicationConfig],
+		   %io:format("DEBUG: SetEnvResult ~p~n",[SetEnvResult]),
+
+    {ok,PodApp}=db_appl_spec:read(app,ApplSpec),
+    appl:stop(PodNode,PodApp),
+    appl:unload(PodNode,PodApp,ApplDir),
+    ok=rpc:call(PodNode,file,make_dir,[ApplDir],5000),
+    {ok,_}=appl:git_clone_to_dir(PodNode,PodApplGitPath,ApplDir),
+  
+    ApplEbin=filename:join([ApplDir,"ebin"]),
+    Paths=[ApplEbin],
+   
+    ok=appl:load(PodNode,PodApp,Paths),
+    ok=appl:start(PodNode,PodApp,?TimeOut),
+    ok.
+    
+%% --------------------------------------------------------------------
+%% Function: terminate/2
+%% Description: Shutdown the server
+%% Returns: any (ignored by gen_server)
+%% --------------------------------------------------------------------
 
 %% --------------------------------------------------------------------
 %% Function: terminate/2

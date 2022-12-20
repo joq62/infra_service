@@ -14,6 +14,7 @@
 %% --------------------------------------------------------------------
 %% Include files
 %% --------------------------------------------------------------------
+-define(HeartbeatTime,20*1000).
 
 %% --------------------------------------------------------------------
 
@@ -300,6 +301,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
 hbeat(ClusterSpec)->
+    timer:sleep(?HeartbeatTime),
     rpc:call(node(),?MODULE,wanted_state,[ClusterSpec],30*1000), 
     rpc:cast(node(),?MODULE,heartbeat,[]).
 
