@@ -26,14 +26,27 @@ start()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
     ok=setup(),
-    ok=load_start_math(),
-    ok=check_present_missing(),
+    ok=deploy_test(),
+   % ok=load_start_math(),
+   % ok=check_present_missing(),
   				
      
   
     io:format("Stop OK !!! ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
     ok.
+
+%% --------------------------------------------------------------------
+%% Function: available_hosts()
+%% Description: Based on hosts.config file checks which hosts are avaible
+%% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
+%% --------------------------------------------------------------------
+deploy_test()->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+    appl_server:deploy_appls(?ClusterSpec),
+
+    ok.
+
 
 %% --------------------------------------------------------------------
 %% Function: available_hosts()
