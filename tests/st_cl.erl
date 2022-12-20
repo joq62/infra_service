@@ -42,7 +42,7 @@ start()->
 start_cluster_test()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
        
-    ok=oam:new_db_info(),
+    {ok,_}=oam:new_db_info(),
     oam:new_connect_nodes(),
     {ok,[{pong,'prototype_c201_connect@c201'}]}=oam:ping_connect_nodes(),
     

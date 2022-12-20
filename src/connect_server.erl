@@ -23,7 +23,8 @@
 %% External exports
 -export([
 	 create_dbase_info/1,
-	 create_connect_nodes/1
+	 create_connect_nodes/1,
+	 connect_nodes_info/1
 	]).
 
 
@@ -52,6 +53,7 @@
 %%-------------------------------------------------------------------
 -record(state,{
 	       cluster_spec,
+	       connect_node_maps,
 	       present_connect_nodes,
 	       missing_connect_nodes
 	      }).
@@ -68,6 +70,8 @@ stop()-> gen_server:call(?MODULE, {stop},infinity).
 
 create_dbase_info(ClusterSpec)->
     gen_server:call(?MODULE,{create_dbase_info,ClusterSpec},infinity).
+connect_nodes_info(ClusterSpec)->
+    gen_server:call(?MODULE,{connect_nodes_info,ClusterSpec},infinity).
 
 create_connect_nodes(ClusterSpec)->
     gen_server:call(?MODULE,{create_connect_nodes,ClusterSpec},infinity).
@@ -98,6 +102,7 @@ init([]) ->
     rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Servere started"]]),
 
     {ok, #state{cluster_spec=undefined,
+		connect_node_maps=undefined,
 		missing_connect_nodes=undefined,
 		present_connect_nodes=undefined}}.   
  
@@ -113,13 +118,23 @@ init([]) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
 handle_call({create_dbase_info,ClusterSpec},_From, State) ->
-    Reply=dbase_info(ClusterSpec),
+    Reply=case dbase_info(ClusterSpec) of
+	      {error,ReasonList}->
+		  NewState=State,
+		  {error,ReasonList};
+	      {ok,InfoList}->
+		  NewState=State#state{connect_node_maps=InfoList},
+		  {ok,InfoList}
+	  end,		  
+    {reply, Reply, NewState};
+
+handle_call({connect_nodes_info,_ClusterSpec},_From, State) ->
+    Reply=State#state.connect_node_maps,
     {reply, Reply, State};
 
 handle_call({create_connect_nodes,ClusterSpec},_From, State) ->
     Reply=connect_nodes(ClusterSpec),
     {reply, Reply, State};
-
 
 handle_call({ping},_From, State) ->
     Reply=pong,
@@ -253,13 +268,15 @@ dbase_info(ClusterSpec)->
     dbase_info(ConnectHostSpecs,ClusterSpec,[]).
     
 dbase_info([],_ClusterSpec,Acc)->
-    ErrorList=[{error,[Reason]}||{error,[Reason]}<-Acc],
-    case ErrorList of
-	[]->
-	    ok;
-        Reason->
-	    {error,Reason}
-    end;
+    ReasonList=[Reason||{error,Reason}<-Acc],
+    Result=case ReasonList of 
+	       []->
+		   Info=[Info||{ok,Info}<-Acc],
+		   {ok,Info};
+	       _ ->
+		   {error,ReasonList}
+	   end,
+    Result;
 dbase_info([HostSpec|T],ClusterSpec,Acc)->
     {ok,ClusterDir}=db_cluster_spec:read(dir,ClusterSpec),
     {ok,HostName}=db_host_spec:read(hostname,HostSpec),
@@ -270,9 +287,9 @@ dbase_info([HostSpec|T],ClusterSpec,Acc)->
     Status=candidate,
     NewAcc=case db_cluster_instance:create(ClusterSpec,Type,PodName,PodNode,PodDir,HostSpec,Status) of
 	       {atomic,ok}->
-		   [ok|Acc];
+		   [{ok,#{pod_node=>PodNode,pod_dir=>PodDir,hostname=>HostName}}|Acc];
 	       Reason->
-		   [{error,[Reason]}|Acc]
+		   [{error,Reason}|Acc]
 	   end,
     dbase_info(T,ClusterSpec,NewAcc).
      
