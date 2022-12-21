@@ -9,6 +9,8 @@ all:
 	rm -rf Mnesia.*;
 	rm -rf *.dir;
 	rm -rf _build;
+	rm -rf rebar.config;
+	cp tests/rebar.config_release rebar.config;
 	mkdir ebin;
 	rebar3 compile;	
 	cp _build/default/lib/*/ebin/* ebin;
@@ -55,6 +57,8 @@ eunit:
 	rm -rf ebin;
 	rm -rf Mnesia.*;
 	rm -rf *.dir;
+	rm -rf rebar.config;
+	cp tests/rebar.config_test rebar.config;
 #	tests 
 	mkdir tests_ebin;
 	erlc -I include -o tests_ebin tests/*.erl;

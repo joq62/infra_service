@@ -1,7 +1,9 @@
 
 {erl_opts, [debug_info,{i,"include"}]}.
 {deps, [
-        
+        {nodelog,{git,"https://github.com/joq62/nodelog.git", {branch,"main"}}},
+        {resource_discovery,{git,"https://github.com/joq62/resource_discovery.git", {branch,"main"}}},
+	{common,{git,"https://github.com/joq62/common.git", {branch,"main"}}}
       ]}.
 
 {relx, [{release, {infra_service, "0.1.0"},

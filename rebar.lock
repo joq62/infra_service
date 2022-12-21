@@ -1,12 +1,1 @@
-[{<<"common">>,
-  {git,"https://github.com/joq62/common.git",
-       {ref,"71bd1cf941b254283eb52e7c5ee6b033f4b46a03"}},
-  0},
- {<<"nodelog">>,
-  {git,"https://github.com/joq62/nodelog.git",
-       {ref,"d8a31cb58bb0d1066f45636932cd09d41af309e6"}},
-  0},
- {<<"resource_discovery">>,
-  {git,"https://github.com/joq62/resource_discovery.git",
-       {ref,"59d087a879239ee598dcbda1315c985d6163b99e"}},
-  0}].
+[].
