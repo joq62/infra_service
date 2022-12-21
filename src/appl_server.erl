@@ -326,7 +326,7 @@ appl_new(ApplSpec,HostSpec,ClusterSpec,TimeOut)->
 					       ok->
 						   {ok,LocalTypeList}=db_appl_spec:read(local_type,ApplSpec),
 						   [rpc:call(PodNode,rd,add_local_resource,[LocalType,PodNode],5000)||LocalType<-LocalTypeList],
-						   [rd:add_target_resource_type(LocalType)||LocalType<-LocalTypeList],
+						%   [rd:add_target_resource_type(LocalType)||LocalType<-LocalTypeList],
 						   {ok,TargetTypeList}=db_appl_spec:read(target_type,ApplSpec),
 						   [rpc:call(PodNode,rd,add_target_resource_type,[TargetType],5000)||TargetType<-TargetTypeList],
 						   rpc:call(PodNode,rd,trade_resources,[],5000),
@@ -426,13 +426,12 @@ restart_appl(ClusterSpec,{ApplSpec,PodNode})->
 				       ok->
 					   {ok,LocalTypeList}=db_appl_spec:read(local_type,ApplSpec),
 					   [rpc:call(PodNode,rd,add_local_resource,[LocalType,PodNode],5000)||LocalType<-LocalTypeList],
-					   [rd:add_target_resource_type(LocalType)||LocalType<-LocalTypeList],
+					 %  [rd:add_target_resource_type(LocalType)||LocalType<-LocalTypeList],
 					   {ok,TargetTypeList}=db_appl_spec:read(target_type,ApplSpec),
 					   [rpc:call(PodNode,rd,add_target_resource_type,[TargetType],5000)||TargetType<-TargetTypeList],
 					   rpc:call(PodNode,rd,trade_resources,[],5000),
 					   timer:sleep(2000),
-					   {atomic,ok}=db_appl_instance:create(ClusterSpec,ApplSpec,PodNode,HostSpec,{date(),time()}),
-					   rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["application created ",ApplSpec,PodNode]]),
+					   rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["application restarted  ",ApplSpec,PodNode]]),
 					   {ok,PodNode}
 				   end
 			   end
