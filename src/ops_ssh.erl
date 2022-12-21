@@ -106,7 +106,8 @@ delete_dir(HostSpec,Dir)->
     {ok,Uid}=db_host_spec:read(uid,HostSpec),
     {ok,Pwd}=db_host_spec:read(passwd,HostSpec),
     TimeOut=5000,
-    my_ssh:ssh_send(Ip,SshPort,Uid,Pwd,"rm -rf "++Dir,TimeOut),
+    SshDeleteDir=my_ssh:ssh_send(Ip,SshPort,Uid,Pwd,"rm -rf "++Dir,TimeOut),
+    io:format("SshDeleteDir,HostSpec,Dir ~p~n",[{SshDeleteDir,HostSpec,Dir,?MODULE,?LINE}]),
     
 %    case ops_ssh:is_dir(HostName,Dir) of
 %	false->

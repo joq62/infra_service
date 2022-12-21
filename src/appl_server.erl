@@ -172,7 +172,6 @@ handle_cast({start_monitoring,ClusterSpec}, State) ->
 			 present=Present,
 			 missing=Missing		
 			},
-    io:format("start_monitoring,NewState ~p~n",[{NewState,?MODULE,?LINE}]), 
     spawn(fun()->hbeat(ClusterSpec) end),
     {noreply, NewState};
 
@@ -198,7 +197,6 @@ handle_cast({heartbeat}, State) ->
     end,
     NewState=State#state{present=NewPresent,
 			 missing=NewMissing},
-    io:format("heartbeat ,NewState ~p~n",[{NewState,?MODULE,?LINE}]), 
     spawn(fun()->hbeat(State#state.cluster_spec) end),
     {noreply, NewState};
 
@@ -303,32 +301,43 @@ appl_new(ApplSpec,HostSpec,ClusterSpec,TimeOut)->
 		   %% set application envs
 		   {ok,ApplicationConfig}=db_host_spec:read(application_config,HostSpec),  
 		   _SetEnvResult=[rpc:call(PodNode,application,set_env,[[Config]],5000)||Config<-ApplicationConfig],
-		   %io:format("DEBUG: SetEnvResult ~p~n",[SetEnvResult]),
-
-		   ok=rpc:call(PodNode,file,make_dir,[ApplDir],5000),
-		   {ok,_}=appl:git_clone_to_dir(PodNode,PodApplGitPath,ApplDir),
-		   {ok,PodApp}=db_appl_spec:read(app,ApplSpec),
-		   ApplEbin=filename:join([ApplDir,"ebin"]),
-		   Paths=[ApplEbin],
-		   
-		   ok=appl:load(PodNode,PodApp,Paths),
-		   ok=appl:start(PodNode,PodApp,TimeOut),
-		 
-	    
-	     % Init 
-		   {ok,LocalTypeList}=db_appl_spec:read(local_type,ApplSpec),
-		   [rpc:call(PodNode,rd,add_local_resource,[LocalType,PodNode],5000)||LocalType<-LocalTypeList],
-		   %% Make it available for oam - debug 
-		   [rd:add_target_resource_type(LocalType)||LocalType<-LocalTypeList],
-
-		   {ok,TargetTypeList}=db_appl_spec:read(target_type,ApplSpec),
-		   [rpc:call(PodNode,rd,add_target_resource_type,[TargetType],5000)||TargetType<-TargetTypeList],
-		   
-		   rpc:call(PodNode,rd,trade_resources,[],5000),
-		   timer:sleep(2000),
-		   {atomic,ok}=db_appl_instance:create(ClusterSpec,ApplSpec,PodNode,HostSpec,{date(),time()}),
-		   rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["application created ",ApplSpec,PodNode]]),
-		   {ok,PodNode}
+		   case rpc:call(PodNode,file,make_dir,[ApplDir],5000) of
+		       {error,Reason}->
+			   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
+			   {error,Reason};
+		       ok->
+			   case appl:git_clone_to_dir(PodNode,PodApplGitPath,ApplDir) of
+			       {error,Reason}->
+				   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
+				   {error,Reason};
+			       {ok,_}->
+				   {ok,PodApp}=db_appl_spec:read(app,ApplSpec),
+				   ApplEbin=filename:join([ApplDir,"ebin"]),
+				   Paths=[ApplEbin],
+				   case appl:load(PodNode,PodApp,Paths) of
+				       {error,Reason}->
+					   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
+					   {error,Reason}; 
+				       ok->
+					   case appl:start(PodNode,PodApp,TimeOut) of
+					       {error,Reason}->
+						   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
+						   {error,Reason};
+					       ok->
+						   {ok,LocalTypeList}=db_appl_spec:read(local_type,ApplSpec),
+						   [rpc:call(PodNode,rd,add_local_resource,[LocalType,PodNode],5000)||LocalType<-LocalTypeList],
+						   [rd:add_target_resource_type(LocalType)||LocalType<-LocalTypeList],
+						   {ok,TargetTypeList}=db_appl_spec:read(target_type,ApplSpec),
+						   [rpc:call(PodNode,rd,add_target_resource_type,[TargetType],5000)||TargetType<-TargetTypeList],
+						   rpc:call(PodNode,rd,trade_resources,[],5000),
+						   timer:sleep(2000),
+						   {atomic,ok}=db_appl_instance:create(ClusterSpec,ApplSpec,PodNode,HostSpec,{date(),time()}),
+						   rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["application created ",ApplSpec,PodNode]]),
+						   {ok,PodNode}
+					   end
+				   end
+			   end
+		   end
 	   end,
     Result.
 %% --------------------------------------------------------------------
@@ -370,8 +379,8 @@ wanted_state(ClusterSpec)->
     
     MissingPresentNodes=[{ApplSpec,PodNode}||{ApplSpec,PodNode,_App}<-missing(ClusterSpec),
 					     pong==net_adm:ping(PodNode)],
-    R=[rpc:call(node(),?MODULE,restart_appl,[ClusterSpec,{ApplSpec,PodNode}],10*1000)||{ApplSpec,PodNode}<-MissingPresentNodes],
-    io:format(" ~p~n",[{R,?MODULE,?FUNCTION_NAME}]),
+    [rpc:call(node(),?MODULE,restart_appl,[ClusterSpec,{ApplSpec,PodNode}],10*1000)||{ApplSpec,PodNode}<-MissingPresentNodes],
+%    io:format(" ~p~n",[{R,?MODULE,?FUNCTION_NAME}]),
     ok.
     
     
@@ -393,15 +402,34 @@ restart_appl(ClusterSpec,{ApplSpec,PodNode})->
     {ok,PodApp}=db_appl_spec:read(app,ApplSpec),
     appl:stop(PodNode,PodApp),
     appl:unload(PodNode,PodApp,ApplDir),
-    ok=rpc:call(PodNode,file,make_dir,[ApplDir],5000),
-    {ok,_}=appl:git_clone_to_dir(PodNode,PodApplGitPath,ApplDir),
-  
-    ApplEbin=filename:join([ApplDir,"ebin"]),
-    Paths=[ApplEbin],
-   
-    ok=appl:load(PodNode,PodApp,Paths),
-    ok=appl:start(PodNode,PodApp,?TimeOut),
-    ok.
+    Result=case rpc:call(PodNode,file,make_dir,[ApplDir],5000) of
+	       {error,Reason}->
+		   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["couldnt create dir :",ApplDir,Reason]]),
+		   {error,Reason};
+	       ok->
+		   case appl:git_clone_to_dir(PodNode,PodApplGitPath,ApplDir) of
+		       {error,Reason}->
+			   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
+			   {error,Reason};
+		       {ok,_}->
+			   ApplEbin=filename:join([ApplDir,"ebin"]),
+			   Paths=[ApplEbin],
+			   case appl:load(PodNode,PodApp,Paths) of
+			       {error,Reason}->
+				   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
+				   {error,Reason};
+			       ok->
+				   case appl:start(PodNode,PodApp,?TimeOut) of
+				       {error,Reason}->
+					   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
+					   {error,Reason};
+				       ok->
+					   {ok,PodNode}
+				   end
+			   end
+		   end
+	   end,
+    Result.
     
 %% --------------------------------------------------------------------
 %% Function: terminate/2
@@ -416,50 +444,18 @@ restart_appl(ClusterSpec,{ApplSpec,PodNode})->
 %% --------------------------------------------------------------------
 deploy(ClusterSpec)->
     ApplDeploySpecList=db_appl_deployment:read_all(),
-    io:format(" ApplDeploySpecList,ClusterSpec ~p~n",[{ApplDeploySpecList,ClusterSpec,?MODULE,?LINE}]),
+%    io:format(" ApplDeploySpecList,ClusterSpec ~p~n",[{ApplDeploySpecList,ClusterSpec,?MODULE,?LINE}]),
     start_appl(ApplDeploySpecList,ClusterSpec).
 
-% Affinity: any_host,[HostSpec,,,HostSpecN]
-% db_appl_deployment:create(SpecId,ApplSpec,Vsn,ClusterSpec,NumInstances,Affinity)
-% {SpecId,ApplSpec,Vsn,ClusterSpec,NumInstances,Affinity}
-
- % pod_server:get_pod(ApplSpec,HostSpec)
-% pod_server:new(ApplSpec,HostSpec,ClusterSpec,InstanceId)
-% db_appl_instance:create(ClusterSpec,ClusterInstance,ApplSpec,PodNode,HostSpec,Status)
-
-% {ok,PodNode} appl_server:new(ApplSpec,HostSpec,ClusterSpec,InstanceId)
-
-% {appl_deployment,"math",
-% [{appl_spec,"math"},
-%  {vsn,"0.1.0"},	
-%  {cluster_spec,"c200_c201"},
-%  {num_instances,2 },
-%  {affinity,any_host}	
-% ]
-% }.
 start_appl([],_CurrentClusterSpec)->
     ok;
           
 start_appl([{_Id,ApplSpec,_Vsn,ClusterSpec,NumInstances,Affinity}|T],CurrentClusterSpec)->
-    io:format("ApplSpec,ClusterSpec,NumInstances,Affinity,CurrentClusterSpec ~p~n",[{ApplSpec,
-										     ClusterSpec,
-										     NumInstances,
-										     Affinity,
-										     CurrentClusterSpec,
-										     ?MODULE,?FUNCTION_NAME,?LINE}]),
     case (CurrentClusterSpec == ClusterSpec) of
 	false->
-	    io:format("false,ApplSpec,CurrentClusterSpec,ClusterSpec ~p~n",[{ApplSpec,CurrentClusterSpec,
-									     ClusterSpec,
-									     ?MODULE,?FUNCTION_NAME,?LINE}]),
 	    false;
 	true->
 	    {ok,WorkerHostSpecs}=db_cluster_spec:read(worker_host_specs,ClusterSpec),
-	      io:format("true,ApplSpec,WorkerHostSpecs,CurrentClusterSpec,ClusterSpec ~p~n",[{ApplSpec,
-											       WorkerHostSpecs,
-											       CurrentClusterSpec,
-											       ClusterSpec,
-											       ?MODULE,?FUNCTION_NAME,?LINE}]),
 	    start_appl(ApplSpec,CurrentClusterSpec,NumInstances,Affinity,WorkerHostSpecs)
     end,
     start_appl(T,CurrentClusterSpec).
@@ -467,14 +463,26 @@ start_appl([{_Id,ApplSpec,_Vsn,ClusterSpec,NumInstances,Affinity}|T],CurrentClus
 start_appl(_ApplSpec,_CurrentClusterSpec,0,_Affinity,_WorkerHostSpecs)->
     ok;
 start_appl(ApplSpec,CurrentClusterSpec,N,any_host,[HostSpec|T])->
-    R=appl_new(ApplSpec,HostSpec,CurrentClusterSpec,60*1000),
-    io:format("R,ApplSpec,any_host,HostSpec ~p~n",[{R,ApplSpec,any_host,HostSpec,?MODULE,?FUNCTION_NAME,?LINE}]),
+    _Result=case appl_new(ApplSpec,HostSpec,CurrentClusterSpec,60*1000) of
+		{error,Reason}->
+		    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,[error_creating_appl_at_host,ApplSpec,HostSpec,Reason]]),
+		    {error,[error_creating_appl_at_host,ApplSpec,HostSpec,Reason,?MODULE,?FUNCTION_NAME,?LINE]};
+		{ok,PodNode}->
+		    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,[appl_created_host,ApplSpec,HostSpec,PodNode]]),
+		    {ok,PodNode}
+	    end,
     RotatedHostSpecList=lists:append(T,[HostSpec]),
     start_appl(ApplSpec,CurrentClusterSpec,N-1,any_host,RotatedHostSpecList);
 
 start_appl(ApplSpec,CurrentClusterSpec,N,[HostSpec|T],WorkerHostSpecs)->
-    R=appl_new(ApplSpec,HostSpec,CurrentClusterSpec,60*1000),
-    io:format("R,ApplSpec,N,HostSpec ~p~n",[{R,ApplSpec,N,HostSpec,?MODULE,?FUNCTION_NAME,?LINE}]),
+    _Result=case appl_new(ApplSpec,HostSpec,CurrentClusterSpec,60*1000) of
+		{error,Reason}->
+		    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,[error_creating_appl_at_host,ApplSpec,HostSpec,Reason]]),
+		    {error,[error_creating_appl_at_host,ApplSpec,HostSpec,Reason,?MODULE,?FUNCTION_NAME,?LINE]};
+		{ok,PodNode}->
+		    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,[appl_created_host,ApplSpec,HostSpec,PodNode]]),
+		    {ok,PodNode}
+	    end,
     RotatedHostSpecList=lists:append(T,[HostSpec]),
     start_appl(ApplSpec,CurrentClusterSpec,N-1,RotatedHostSpecList,WorkerHostSpecs).
 

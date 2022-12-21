@@ -17,6 +17,7 @@
 %% --------------------------------------------------------------------
 %-compile(export_all).
 -export([
+	 rm_dir/2,
 	 git_clone/3,
 	 git_clone_to_dir/3,
 	 load/3,
@@ -31,6 +32,42 @@
 %% ====================================================================
 %% External functions
 %% ====================================================================
+-define(DeleteDirTime,100).
+-define(DeleteDirIterations,25).
+
+rm_dir(Node,Dir)->
+    Result=case rpc:call(Node,os,cmd,["rm -rf "++Dir],5000) of
+	       {badrpc,Reason}->
+		   {error,["failed to delete dir :",badrpc,Reason,?MODULE,?FUNCTION_NAME,?LINE]};
+	       [] ->
+		   case check_is_deleted(Node,Dir) of
+		       false->
+			   {error,["failed to delete dir : ",Node,Dir]};
+		       true ->
+			   ok
+		   end
+	   end,
+    Result.
+
+check_is_deleted(Node,Dir) ->
+    check_is_deleted(Node,Dir,?DeleteDirIterations,?DeleteDirTime,false).
+    
+check_is_deleted(_Node,_Dir,_Num,_Time,true)->
+    true;
+check_is_deleted(_Node,_Dir,0,_Time,Bool) ->
+    Bool;
+check_is_deleted(Node,Dir,N,Time,_Bool) ->
+    NewBool=case rpc:call(Node,filelib,is_dir,[Dir],3000) of
+		{badrpc,_Reason}->
+		    timer:sleep(Time),
+		    false;
+		true ->
+		    timer:sleep(Time),
+		    false;
+		false->
+		    true
+	    end,
+    check_is_deleted(Node,Dir,N-1,Time,NewBool).
 
 %% --------------------------------------------------------------------
 %% Function:start/0 
@@ -47,10 +84,10 @@ git_clone_to_dir(Node,GitPath,DirToClone)->
 	    TempDirName=erlang:integer_to_list(os:system_time(microsecond),36)++".dir",
 	    TempDir=filename:join(Root,TempDirName),
 	  %  io:format("TempDir ~p~n",[TempDir]),
-	    case rpc:call(Node,os,cmd,["rm -rf "++TempDir],5000) of
-		{badrpc,Reason}->
-		    {error,[badrpc,Reason]};
-		[]->
+	    case rm_dir(Node,TempDir) of
+		{error,Reason}->
+		    {error,[Reason]};
+		ok->
 		    case rpc:call(Node,file,make_dir,[TempDir],5000) of
 			{badrpc,Reason}->
 			    {error,[badrpc,Reason]};
@@ -63,10 +100,10 @@ git_clone_to_dir(Node,GitPath,DirToClone)->
 					{badrpc,Reason}->
 					    {error,[badrpc,Reason,CloneResult]};
 					[]->
-					    case rpc:call(Node,os,cmd,["rm -r  "++TempDir],5000) of
-						{badrpc,Reason}->
-						    {error,[badrpc,Reason,CloneResult]};
-						[]->
+					    case rm_dir(Node,TempDir) of
+						{error,Reason}->
+						    {error,[Reason]};
+						ok->
 						    {ok,CloneDir}
 					    end;
 					Reason ->
@@ -141,8 +178,7 @@ stop(Node,App)->
 %% --------------------------------------------------------------------
 unload(Node,App,Dir)->
     rpc:call(Node,application,unload,[App],2*5000), 
-    rpc:call(Node,os,cmd,["rm -rf "++Dir],2*5000),
-    ok.
+    rm_dir(Node,Dir).
 %% --------------------------------------------------------------------
 %% Function:start/0 
 %% Description: Initiate the eunit tests, set upp needed processes etc
