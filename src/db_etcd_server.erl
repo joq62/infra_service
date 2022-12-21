@@ -96,7 +96,6 @@ handle_call({ping},_From, State) ->
     {reply, Reply, State};
 
 handle_call({stop},_From, State) ->
-    Reply=pong,
     {stop, normal,stopped, State};
 
 handle_call(Request, From, State) ->
