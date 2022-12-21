@@ -9,6 +9,7 @@ all:
 	rm -rf Mnesia.*;
 	rm -rf *.dir;
 	rm -rf _build;
+	rm -rf log_dir prototype_c201;
 	rm -rf rebar.config;
 	cp tests/rebar.config_release rebar.config;
 	mkdir ebin;
