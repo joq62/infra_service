@@ -1,4 +1,4 @@
 [{<<"nodelog_service">>,
   {git,"https://github.com/joq62/nodelog_service.git",
-       {ref,"d3ba120bc18f8cc6bf0d188a796569aace8e714b"}},
+       {ref,"22e5fe7d84620a107f3f690c6372e9835dc16479"}},
   0}].
