@@ -64,4 +64,4 @@ eunit:
 	rebar3 compile;	
 	cp _build/default/lib/*/ebin/* ebin;
 	erlc -I include -o ebin src/*.erl;
-	erl -pa * -pa ebin -pa tests_ebin -sname do_test -run $(m) start -setcookie test_cookie 
+	erl -pa * -pa ebin -pa tests_ebin -sname do_test -run $(m) start $(a) -setcookie test_cookie 

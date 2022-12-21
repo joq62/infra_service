@@ -55,15 +55,12 @@ ssh_delete(HostName,ConnecNode,NodeDir)->
 ssh_create(HostName,NodeName,NodeDir,Cookie,PaArgs,EnvArgs,NodesToConnect)->
     ssh_create(HostName,NodeName,NodeDir,Cookie,PaArgs,EnvArgs,NodesToConnect,?TimeOut).
 ssh_create(HostName,NodeName,NodeDir,Cookie,PaArgs,EnvArgs,NodesToConnect,TimeOut)->
-    %Create erlang vm
- %   io:format("HostName ~p~n",[{HostName,?MODULE,?FUNCTION_NAME}]),
- %   io:format("NodeName ~p~n",[{NodeName,?MODULE,?FUNCTION_NAME}]),
- %   io:format("NodeDir ~p~n",[{NodeDir,?MODULE,?FUNCTION_NAME}]),
-    ops_ssh:delete_dir(HostName,NodeDir),
     Result=case ops_ssh:create(HostName,NodeName,Cookie,PaArgs,EnvArgs) of
 	       {error,Reason}->
 		   {error,[Reason,?MODULE,?FUNCTION_NAME,?LINE]};
 	       {ok,ConnectNode}-> % Create controller and cluster directory
+		   _Debug=rpc:call(ConnectNode,file,del_dir_r,[NodeDir],5000),
+		 %  io:format("Debug,ConnectNode,file,del_dir_r,[NodeDir] ~p~n",[{Debug,ConnectNode,NodeDir,?MODULE,?FUNCTION_NAME}]),
 		   case rpc:call(ConnectNode,file,make_dir,[NodeDir],TimeOut) of
 		       {badrpc,Reason}->
 			   ops_ssh:delete_dir(HostName,NodeDir),

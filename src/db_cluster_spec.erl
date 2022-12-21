@@ -123,10 +123,10 @@ git_clone_load()->
 	       {ok,TempDirName,SpecDir}->
 		   case from_file(SpecDir) of
 		       {error,Reason}->
-			   os:cmd("rm -rf "++TempDirName),	
+			   file:del_dir_r(TempDirName),	
 			   {error,Reason};
 		       LoadResult->
-			   os:cmd("rm -rf "++TempDirName),	
+			   file:del_dir_r(TempDirName),		
 			   LoadResult
 		   end
 	   end,
@@ -135,14 +135,13 @@ git_clone_load()->
 git_clone()->
     TempDirName=erlang:integer_to_list(os:system_time(microsecond),36)++".dir",
     ok=file:make_dir(TempDirName),
+    true=filelib:is_dir(TempDirName),
+
     GitDir=filename:join(TempDirName,?ClusterSpecDir),
-    GitPath=?GitPathClusterSpecs,
-    os:cmd("rm -rf "++GitDir),    
-    timer:sleep(500),
     ok=file:make_dir(GitDir),
-    true=filelib:is_dir(GitDir),
-    GitResult=appl:git_clone_to_dir(node(),GitPath,GitDir),
-    Result=case filelib:is_dir(GitDir) of
+    GitPath=?GitPathClusterSpecs,
+    {ok,GitResult}=appl:git_clone_to_dir(node(),GitPath,GitDir),
+     Result=case filelib:is_dir(GitDir) of
 	       false->
 		   {error,[failed_to_clone,GitPath,GitResult]};
 	       true->

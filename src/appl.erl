@@ -17,7 +17,7 @@
 %% --------------------------------------------------------------------
 %-compile(export_all).
 -export([
-	 rm_dir/2,
+%	 rm_dir/2,
 	 git_clone/3,
 	 git_clone_to_dir/3,
 	 load/3,
@@ -75,34 +75,37 @@ check_is_deleted(Node,Dir,N,Time,_Bool) ->
 %% Returns: non
 %% --------------------------------------------------------------------
 git_clone_to_dir(Node,GitPath,DirToClone)->
+    
     case rpc:call(Node,file,get_cwd,[],5000) of  
 	{badrpc,Reason}->
 	    {error,[badrpc,Reason]};
 	  {ok,Root}->
 	    CloneDir=filename:join(Root,DirToClone),
-	 %   io:format("CloneDir ~p~n",[CloneDir]),
+	   % io:format("CloneDir ~p~n",[CloneDir]),
 	    TempDirName=erlang:integer_to_list(os:system_time(microsecond),36)++".dir",
 	    TempDir=filename:join(Root,TempDirName),
 	  %  io:format("TempDir ~p~n",[TempDir]),
-	    case rm_dir(Node,TempDir) of
-		{error,Reason}->
-		    {error,[Reason]};
-		ok->
+	    case rpc:call(Node,file,del_dir_r,[TempDir],5000) of 
+		{badrpc,Reason}->
+		    {error,[badrpc,Reason,?MODULE,?LINE]};
+		_->
 		    case rpc:call(Node,file,make_dir,[TempDir],5000) of
 			{badrpc,Reason}->
-			    {error,[badrpc,Reason]};
+			    {error,[badrpc,Reason,?MODULE,?LINE]};
 			ok->
 			    case rpc:call(Node,os,cmd,["git clone "++GitPath++" "++TempDir],5000) of
 				{badrpc,Reason}->
-				    {error,[badrpc,Reason]};
+				    {error,[badrpc,Reason,?MODULE,?LINE]};
 				CloneResult->
 				    case rpc:call(Node,os,cmd,["mv  "++TempDir++"/*"++" "++CloneDir],5000) of
 					{badrpc,Reason}->
-					    {error,[badrpc,Reason,CloneResult]};
+					    {error,[badrpc,Reason,CloneResult,?MODULE,?LINE]};
 					[]->
-					    case rm_dir(Node,TempDir) of
+					    case rpc:call(Node,file,del_dir_r,[TempDir],5000) of
+						{badrpc,Reason}->
+						    {error,[badrpc,Reason,?MODULE,?LINE]};
 						{error,Reason}->
-						    {error,[Reason]};
+						    {error,[Reason,?MODULE,?LINE]};
 						ok->
 						    {ok,CloneDir}
 					    end;
@@ -178,7 +181,7 @@ stop(Node,App)->
 %% --------------------------------------------------------------------
 unload(Node,App,Dir)->
     rpc:call(Node,application,unload,[App],2*5000), 
-    rm_dir(Node,Dir).
+    rpc:call(Node,file,del_dir_r,[Dir],5000).
 %% --------------------------------------------------------------------
 %% Function:start/0 
 %% Description: Initiate the eunit tests, set upp needed processes etc

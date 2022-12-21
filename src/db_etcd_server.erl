@@ -157,7 +157,7 @@ do_install()->
     ClusterSpec=db_cluster_spec:git_clone_load(),
     Ok_ClusterSpec=[X||{ok,X}<-ClusterSpec],
     Err_ClusterSpec=[X||{error,X}<-ClusterSpec],
-
+  
     ok=db_host_spec:create_table(),
     HostSpec=db_host_spec:git_clone_load(),
     Ok_HostSpec=[X||{ok,X}<-HostSpec],
@@ -177,4 +177,17 @@ do_install()->
 
     ok=db_appl_instance:create_table(),
     
-    ok.
+    Test=lists:append([Ok_ClusterSpec,Ok_HostSpec,Ok_ApplSpec,Ok_ApplDeployment,
+		       Err_ClusterSpec,Err_HostSpec,Err_ApplSpec,Err_ApplDeployment]),
+		       
+
+    Result=case Test of
+	       []->
+		   {error,[{cluster,spec,Ok_ClusterSpec,Err_ClusterSpec},
+			   {host_spec,Ok_HostSpec,Err_HostSpec},
+			   {appl_spec,Ok_ApplSpec,Err_ApplSpec},
+			   {appl_deployment,Ok_ApplDeployment,Err_ApplDeployment}]};
+	       _ ->
+		   ok
+	   end,
+    Result.

@@ -106,15 +106,15 @@ init([]) ->
     % Controller and Workers
     {PresentControllers,MissingControllers}=pod_server:create_controller_pods(ClusterSpec),
     {PresentWorkers,MissingWorkers}=pod_server:create_worker_pods(ClusterSpec),
-    io:format("PresentControllers,MissingControllers ~p~n",[{PresentControllers,MissingControllers,?MODULE,?FUNCTION_NAME}]),
-    io:format("PresentWorkers,MissingWorkers ~p~n",[{PresentWorkers,MissingWorkers,?MODULE,?FUNCTION_NAME}]),
+ %   io:format("PresentControllers,MissingControllers ~p~n",[{PresentControllers,MissingControllers,?MODULE,?FUNCTION_NAME}]),
+  %  io:format("PresentWorkers,MissingWorkers ~p~n",[{PresentWorkers,MissingWorkers,?MODULE,?FUNCTION_NAME}]),
     pod_server:start_monitoring(ClusterSpec),
   
     % Deploy appls
     appl_server:deploy_appls(ClusterSpec),
     appl_server:start_monitoring(ClusterSpec),
     
-    io:format("Started Server ~p~n",[{?MODULE,?LINE}]), 
+ %   io:format("Started Server ~p~n",[{?MODULE,?LINE}]), 
     rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,"Servere started"]),
 
     {ok, #state{}}.   

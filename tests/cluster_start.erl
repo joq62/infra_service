@@ -11,7 +11,7 @@
 %%% -------------------------------------------------------------------
 -module(cluster_start).      
  
--export([start/0]).
+-export([start/1]).
 %% --------------------------------------------------------------------
 %% Include files
 %% --------------------------------------------------------------------
@@ -22,10 +22,10 @@
 %% Description: Based on hosts.config file checks which hosts are avaible
 %% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
 %% --------------------------------------------------------------------
-start()->
+start([ClusterSpec])->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
-    ok=setup(),
+    ok=setup(ClusterSpec),
     ok=start_cluster_test(),
         
   
@@ -58,7 +58,7 @@ start_cluster_test()->
 %% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
 %% --------------------------------------------------------------------
 
-setup()->
+setup(ClusterSpec)->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
     % stop all pods 
@@ -68,16 +68,15 @@ setup()->
 					      '2_prototype_c201_worker@c201',
 					      prototype_c201_connect@c201]],
 
-    ok=application:set_env([{infra_service_app,[{cluster_spec,?ClusterSpec}]}]),
+ %   ok=application:set_env([{infra_service_app,[{cluster_spec,?ClusterSpec}]}]),
+    ok=application:set_env([{infra_service_app,[{cluster_spec,ClusterSpec}]}]),
      
     {ok,_}=db_etcd_server:start(),
- %   db_etcd:install(),
- %   ok=db_appl_instance:create_table(),
-  %  ok=db_cluster_instance:create_table(),
-    
-    {ok,ClusterDir}=db_cluster_spec:read(dir,?ClusterSpec),
-    os:cmd("rm -rf "++ClusterDir),
+   
+    {ok,ClusterDir}=db_cluster_spec:read(dir,ClusterSpec),
+    file:del_dir_r(ClusterDir),
     ok=file:make_dir(ClusterDir),
+
     {ok,_}=nodelog_server:start(),
     {ok,_}=resource_discovery_server:start(),
     {ok,_}=connect_server:start(),
@@ -85,11 +84,11 @@ setup()->
     {ok,_}=pod_server:start(),
     {ok,_}=oam_server:start(),
     {ok,_}=infra_service_server:start(),
- %   ok=application:start(_app),
+   
     timer:sleep(3000),
 
     %Start cluster 
-  %  io:format("Starts cluster spec  ~p~n",[{?ClusterSpec,?MODULE,?FUNCTION_NAME}]),
+  %  io:format("Starts cluster spec  ~p~n",[{ClusterSpec,?MODULE,?FUNCTION_NAME}]),
     
   %  {ok,_}=oam:new_db_info(),    
   %  ok=oam:new_connect_nodes(),

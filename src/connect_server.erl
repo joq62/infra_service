@@ -239,8 +239,12 @@ hbeat(ClusterSpec)->
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
 wanted_state(ClusterSpec)->
+    Connect=[{Node,db_cluster_instance:read(pod_dir,ClusterSpec,Node)}||Node<-present_connect_nodes(ClusterSpec)],
+    ConnectNoDirs=[Node||{Node,{ok,PodDir}}<-Connect,
+			    true/=rpc:call(Node,filelib,is_dir,[PodDir],2000)],
+    [rpc:call(Node,init,stop,[],2000)||Node<-ConnectNoDirs],
+    MissingConnectNodes=lists:append(ConnectNoDirs,missing_connect_nodes(ClusterSpec)),  
     NodesToConnect=db_cluster_instance:nodes(connect,ClusterSpec),
-    MissingConnectNodes=missing_connect_nodes(ClusterSpec),
     [create_connect_node(ClusterSpec,PodNode,NodesToConnect)||PodNode<-MissingConnectNodes],
     ok.
 
@@ -326,9 +330,11 @@ create_connect_node(ClusterSpec,PodNode,NodesToConnect)->
 		    pong=net_adm:ping(ConnectNode),
 		    case rpc:call(ConnectNode,filelib,is_dir,[PodDir],2000) of
 			{badrpc,Reason}->
+			    rpc:call(ConnectNode,init,stop,[],5000),
 			    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["failed to create dir ",PodDir,Reason]]),
 			    {error,[badrpc,Reason,?MODULE_STRING,?LINE]};
 			false->
+			    rpc:call(ConnectNode,init,stop,[],5000),
 			    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["failed to create dir ",PodDir]]),
 			    {error,["cluster dir not created",PodDir,?MODULE_STRING,?LINE]};
 			true->
