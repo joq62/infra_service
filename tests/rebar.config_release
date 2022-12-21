@@ -1,7 +1,7 @@
 
 {erl_opts, [debug_info,{i,"include"}]}.
 {deps, [
-        
+         {nodelog_service,{git,"https://github.com/joq62/nodelog_service.git", {branch,"main"}}}
       ]}.
 
 {relx, [{release, {infra_service, "0.1.0"},
