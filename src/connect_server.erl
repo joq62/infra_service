@@ -302,6 +302,8 @@ dbase_info([HostSpec|T],ClusterSpec,Acc)->
 
 connect_nodes(ClusterSpec)->
     NodesToConnect=db_cluster_instance:nodes(connect,ClusterSpec),
+    _StoppedNodes=[{Node,rpc:call(Node,init,stop,[],2000)}||Node<-NodesToConnect],
+    %io:format("StoppedNodes ~p~n",[{StoppedNodes,?MODULE,?FUNCTION_NAME}]),
     MissingConnectNodes=[Node||Node<-NodesToConnect, 
 			       pang=:=net_adm:ping(Node)],
     [create_connect_node(ClusterSpec,PodNode,NodesToConnect)||PodNode<-MissingConnectNodes].
@@ -318,13 +320,23 @@ create_connect_node(ClusterSpec,PodNode,NodesToConnect)->
     EnvArgs=" ",
     Result= case ops_vm:ssh_create(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,NodesToConnect,?TimeOut) of
 		{error,Reason}->
+		    io:format("failed to create connect node  ~p~n",[{Reason,?MODULE,?FUNCTION_NAME,?LINE}]),
 		    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["failed to create connect node ",error,Reason]]),
 		    {error,Reason};
 		{ok,ConnectNode,NodeDir,PingResult}->
-		    
 		    pong=net_adm:ping(ConnectNode),
-		    ok=rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Started connect node: ",ConnectNode,NodeDir]]),
-		    {ok,ConnectNode,NodeDir,PingResult}
+		    case rpc:call(ConnectNode,filelib,is_dir,[PodDir],2000) of
+			{badrpc,Reason}->
+			    io:format("badrpc,Reason  ~p~n",[{badrpc,Reason,?MODULE,?FUNCTION_NAME,?LINE}]),
+			    {error,[badrpc,Reason,?MODULE_STRING,?LINE]};
+			false->
+			    io:format("failed to create dir  ~p~n",[{PodDir,?MODULE,?FUNCTION_NAME,?LINE}]),
+			    {error,["cluster dir not created",PodDir,?MODULE_STRING,?LINE]};
+			true->
+			    io:format("Started connect node:  ~p~n",[{ConnectNode,PodDir,?MODULE,?FUNCTION_NAME,?LINE}]),
+			    ok=rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Started connect node: ",ConnectNode,NodeDir]]),
+			    {ok,ConnectNode,NodeDir,PingResult}
+		    end
 	    end,
     Result.
 

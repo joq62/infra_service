@@ -2,7 +2,7 @@
              [{description,"An OTP application"},
               {vsn,"0.1.0"},
               {registered,[]},
-              {mod,{infra_service_app_app,[]}},
+              {mod,{infra_service,[]}},
               {applications,[kernel,stdlib]},
               {env,[]},
               {modules,[]},

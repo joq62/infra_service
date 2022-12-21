@@ -72,6 +72,7 @@ init([]) ->
     {ok,ClusterSpec}=application:get_env(infra_service_app,cluster_spec),
  %   {ok,ClusterDir}=db_cluster_spec:read(dir,ClusterSpec),
     % Install nodelog
+
     LogDir="log_dir",
     LogFile="logs1.logs",
  %   LogDirPath=filename:join(ClusterDir,LogDir),
@@ -97,6 +98,22 @@ init([]) ->
     [rd:add_target_resource_type(Type)||Type<-?TargetTypes],
     ok=rd:trade_resources(),
     timer:sleep(3000),
+
+    %% create cluster
+    {ok,_}=connect_server:create_dbase_info(ClusterSpec),    
+    connect_server:create_connect_nodes(ClusterSpec),
+    connect_server:start_monitoring(ClusterSpec),
+    % Controller and Workers
+    {PresentControllers,MissingControllers}=pod_server:create_controller_pods(ClusterSpec),
+    {PresentWorkers,MissingWorkers}=pod_server:create_worker_pods(ClusterSpec),
+    io:format("PresentControllers,MissingControllers ~p~n",[{PresentControllers,MissingControllers,?MODULE,?FUNCTION_NAME}]),
+    io:format("PresentWorkers,MissingWorkers ~p~n",[{PresentWorkers,MissingWorkers,?MODULE,?FUNCTION_NAME}]),
+    pod_server:start_monitoring(ClusterSpec),
+  
+    % Deploy appls
+    appl_server:deploy_appls(ClusterSpec),
+    appl_server:start_monitoring(ClusterSpec),
+    
     io:format("Started Server ~p~n",[{?MODULE,?LINE}]), 
     rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,"Servere started"]),
 
