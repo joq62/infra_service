@@ -24,6 +24,7 @@
 -export([
 	 create_dbase_info/1,
 	 create_connect_nodes/1,
+	 create_connect_node/3,
 	 connect_nodes_info/1
 	]).
 
