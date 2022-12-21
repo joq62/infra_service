@@ -172,7 +172,7 @@ handle_cast({start_monitoring,ClusterSpec}, State) ->
 			 present=Present,
 			 missing=Missing		
 			},
-    
+    io:format("start_monitoring,NewState ~p~n",[{NewState,?MODULE,?LINE}]), 
     spawn(fun()->hbeat(ClusterSpec) end),
     {noreply, NewState};
 
@@ -198,7 +198,7 @@ handle_cast({heartbeat}, State) ->
     end,
     NewState=State#state{present=NewPresent,
 			 missing=NewMissing},
-  
+    io:format("heartbeat ,NewState ~p~n",[{NewState,?MODULE,?LINE}]), 
     spawn(fun()->hbeat(State#state.cluster_spec) end),
     {noreply, NewState};
 
@@ -370,8 +370,8 @@ wanted_state(ClusterSpec)->
     
     MissingPresentNodes=[{ApplSpec,PodNode}||{ApplSpec,PodNode,_App}<-missing(ClusterSpec),
 					     pong==net_adm:ping(PodNode)],
-    [rpc:call(node(),?MODULE,restart_appl,[ClusterSpec,{ApplSpec,PodNode}],10*1000)||{ApplSpec,PodNode}<-MissingPresentNodes],
- %   io:format(" ~p~n",[{R,?MODULE,?FUNCTION_NAME}]),
+    R=[rpc:call(node(),?MODULE,restart_appl,[ClusterSpec,{ApplSpec,PodNode}],10*1000)||{ApplSpec,PodNode}<-MissingPresentNodes],
+    io:format(" ~p~n",[{R,?MODULE,?FUNCTION_NAME}]),
     ok.
     
     
@@ -416,7 +416,7 @@ restart_appl(ClusterSpec,{ApplSpec,PodNode})->
 %% --------------------------------------------------------------------
 deploy(ClusterSpec)->
     ApplDeploySpecList=db_appl_deployment:read_all(),
-    io:format(" ApplDeploySpecList ~p~n",[{ApplDeploySpecList,?MODULE,?LINE}]),
+    io:format(" ApplDeploySpecList,ClusterSpec ~p~n",[{ApplDeploySpecList,ClusterSpec,?MODULE,?LINE}]),
     start_appl(ApplDeploySpecList,ClusterSpec).
 
 % Affinity: any_host,[HostSpec,,,HostSpecN]
@@ -437,28 +437,45 @@ deploy(ClusterSpec)->
 %  {affinity,any_host}	
 % ]
 % }.
-start_appl([],_ClusterSpec)->
+start_appl([],_CurrentClusterSpec)->
     ok;
           
 start_appl([{_Id,ApplSpec,_Vsn,ClusterSpec,NumInstances,Affinity}|T],CurrentClusterSpec)->
+    io:format("ApplSpec,ClusterSpec,NumInstances,Affinity,CurrentClusterSpec ~p~n",[{ApplSpec,
+										     ClusterSpec,
+										     NumInstances,
+										     Affinity,
+										     CurrentClusterSpec,
+										     ?MODULE,?FUNCTION_NAME,?LINE}]),
     case (CurrentClusterSpec == ClusterSpec) of
 	false->
+	    io:format("false,ApplSpec,CurrentClusterSpec,ClusterSpec ~p~n",[{ApplSpec,CurrentClusterSpec,
+									     ClusterSpec,
+									     ?MODULE,?FUNCTION_NAME,?LINE}]),
 	    false;
 	true->
 	    {ok,WorkerHostSpecs}=db_cluster_spec:read(worker_host_specs,ClusterSpec),
-	    start_appl(ApplSpec,ClusterSpec,NumInstances,Affinity,WorkerHostSpecs)
+	      io:format("true,ApplSpec,WorkerHostSpecs,CurrentClusterSpec,ClusterSpec ~p~n",[{ApplSpec,
+											       WorkerHostSpecs,
+											       CurrentClusterSpec,
+											       ClusterSpec,
+											       ?MODULE,?FUNCTION_NAME,?LINE}]),
+	    start_appl(ApplSpec,CurrentClusterSpec,NumInstances,Affinity,WorkerHostSpecs)
     end,
-    start_appl(T,ClusterSpec).
+    start_appl(T,CurrentClusterSpec).
 
-start_appl(_ApplSpec,_ClusterSpec,0,_Affinity,_WorkerHostSpecs)->
+start_appl(_ApplSpec,_CurrentClusterSpec,0,_Affinity,_WorkerHostSpecs)->
     ok;
-start_appl(ApplSpec,ClusterSpec,N,any_host,[HostSpec|T])->
-    _R=appl_new(ApplSpec,HostSpec,ClusterSpec,60*1000),
+start_appl(ApplSpec,CurrentClusterSpec,N,any_host,[HostSpec|T])->
+    R=appl_new(ApplSpec,HostSpec,CurrentClusterSpec,60*1000),
+    io:format("R,ApplSpec,any_host,HostSpec ~p~n",[{R,ApplSpec,any_host,HostSpec,?MODULE,?FUNCTION_NAME,?LINE}]),
     RotatedHostSpecList=lists:append(T,[HostSpec]),
-    start_appl(ApplSpec,ClusterSpec,N-1,any_host,RotatedHostSpecList);
-start_appl(ApplSpec,ClusterSpec,N,[HostSpec|T],WorkerHostSpecs)->
-    _R=appl_new(ApplSpec,HostSpec,ClusterSpec,60*1000),
+    start_appl(ApplSpec,CurrentClusterSpec,N-1,any_host,RotatedHostSpecList);
+
+start_appl(ApplSpec,CurrentClusterSpec,N,[HostSpec|T],WorkerHostSpecs)->
+    R=appl_new(ApplSpec,HostSpec,CurrentClusterSpec,60*1000),
+    io:format("R,ApplSpec,N,HostSpec ~p~n",[{R,ApplSpec,N,HostSpec,?MODULE,?FUNCTION_NAME,?LINE}]),
     RotatedHostSpecList=lists:append(T,[HostSpec]),
-    start_appl(ApplSpec,ClusterSpec,N-1,RotatedHostSpecList,WorkerHostSpecs).
+    start_appl(ApplSpec,CurrentClusterSpec,N-1,RotatedHostSpecList,WorkerHostSpecs).
 
 	    

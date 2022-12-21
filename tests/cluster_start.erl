@@ -60,7 +60,14 @@ start_cluster_test()->
 
 setup()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-    
+
+    % stop all pods 
+    rpc:call(prototype_c201_connect@c201,init,stop,[],2000),
+    [rpc:call(Node,init,stop,[],2000)||Node<-['1_prototype_c201_controller@c201',
+					      '1_prototype_c201_worker@c201',
+					      '2_prototype_c201_worker@c201',
+					      prototype_c201_connect@c201]],
+
     ok=application:set_env([{infra_service_app,[{cluster_spec,?ClusterSpec}]}]),
      
     {ok,_}=db_etcd_server:start(),

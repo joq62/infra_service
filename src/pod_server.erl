@@ -192,14 +192,16 @@ handle_call(Request, From, State) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
 handle_cast({start_monitoring,ClusterSpec}, State) ->
-
+    io:format("start_monitoring,ClusterSpec ~p~n",[{ClusterSpec,?MODULE,?FUNCTION_NAME}]),
     PresentControllerNodes=present_controller_nodes(ClusterSpec),
     MissingControllerNodes=missing_controller_nodes(ClusterSpec),
-       
+    io:format("PresentControllerNodes,MissingControllerNodes ~p~n",[{PresentControllerNodes,
+								     MissingControllerNodes,
+								     ?MODULE,?FUNCTION_NAME}]),
     PresentWorkerNodes=present_worker_nodes(ClusterSpec),
     MissingWorkerNodes=missing_worker_nodes(ClusterSpec),
   
-
+    
     NewState=State#state{cluster_spec=ClusterSpec,
 			 present_controller_nodes=PresentControllerNodes,
 			 missing_controller_nodes=MissingControllerNodes,
