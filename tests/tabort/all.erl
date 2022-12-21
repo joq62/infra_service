@@ -11,22 +11,28 @@
 %%% -------------------------------------------------------------------
 -module(all).      
  
--export([start/1]).
+-export([start/0]).
 %% --------------------------------------------------------------------
 %% Include files
 %% --------------------------------------------------------------------
+
 
 %% --------------------------------------------------------------------
 %% Function: available_hosts()
 %% Description: Based on hosts.config file checks which hosts are avaible
 %% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
 %% --------------------------------------------------------------------
-start([ClusterSpec])->
+start()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-    
-    ok=setup(ClusterSpec),
-    ok=cluster_start:start(ClusterSpec),
+
+    ok=setup(),
        
+    ok=cluster_start:start(),
+    ok=appl_tests:start(),
+    
+    
+   
+   
     io:format("Stop OK !!! ~p~n",[{?MODULE,?FUNCTION_NAME}]),
  %   timer:sleep(2000),
  %  init:stop(),
@@ -47,17 +53,9 @@ start([ClusterSpec])->
 
 setup()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-  
-    ok.
-
-
-%% Function: available_hosts()
-%% Description: Based on hosts.config file checks which hosts are avaible
-%% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
-%% --------------------------------------------------------------------
-
-setup(ClusterSpec)->
-    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-     
+        
  
+    
+    io:format("Stop OK !!! ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+
     ok.

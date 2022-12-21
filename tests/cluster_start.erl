@@ -22,7 +22,7 @@
 %% Description: Based on hosts.config file checks which hosts are avaible
 %% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
 %% --------------------------------------------------------------------
-start([ClusterSpec])->
+start(ClusterSpec)->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
     ok=setup(ClusterSpec),
@@ -61,44 +61,25 @@ start_cluster_test()->
 setup(ClusterSpec)->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
-    % stop all pods 
-    rpc:call(prototype_c201_connect@c201,init,stop,[],2000),
-    [rpc:call(Node,init,stop,[],2000)||Node<-['1_prototype_c201_controller@c201',
-					      '1_prototype_c201_worker@c201',
-					      '2_prototype_c201_worker@c201',
-					      prototype_c201_connect@c201]],
-
- %   ok=application:set_env([{infra_service_app,[{cluster_spec,?ClusterSpec}]}]),
     ok=application:set_env([{infra_service_app,[{cluster_spec,ClusterSpec}]}]),
-     
+    
     {ok,_}=db_etcd_server:start(),
-   
     {ok,ClusterDir}=db_cluster_spec:read(dir,ClusterSpec),
     file:del_dir_r(ClusterDir),
     ok=file:make_dir(ClusterDir),
 
-    {ok,_}=nodelog_server:start(),
-    {ok,_}=resource_discovery_server:start(),
-    {ok,_}=connect_server:start(),
-    {ok,_}=appl_server:start(),
-    {ok,_}=pod_server:start(),
-    {ok,_}=oam_server:start(),
-    {ok,_}=infra_service_server:start(),
-   
-    timer:sleep(3000),
+    db_etcd_server:stop(),
+    
+  
+    ok=application:start(test_area),
+      
+    pong=db_etcd:ping(),
+    pong=nodelog:ping(),
+    pong=connect_server:ping(),
+    pong=appl_server:ping(),
+    pong=pod_server:ping(),
+    pong=oam:ping(),
+    pong=infra_service_server:ping(),
 
-    %Start cluster 
-  %  io:format("Starts cluster spec  ~p~n",[{ClusterSpec,?MODULE,?FUNCTION_NAME}]),
-    
-  %  {ok,_}=oam:new_db_info(),    
-  %  ok=oam:new_connect_nodes(),
-    
- %   {PresentControllers,MissingControllers}=oam:new_controllers(),
-  %  {PresentWorkers,MissingWorkers}=oam:new_workers(),
-    
-  %  io:format("PresentControllers,MissingControllers ~p~n",[{PresentControllers,MissingControllers,?MODULE,?FUNCTION_NAME}]),
-   % io:format("PresentWorkers,MissingWorkers ~p~n",[{PresentWorkers,MissingWorkers,?MODULE,?FUNCTION_NAME}]),
-
-    
-    
+      
     ok.
