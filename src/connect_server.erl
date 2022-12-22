@@ -339,7 +339,7 @@ create_connect_node(ClusterSpec,PodNode,NodesToConnect)->
 			    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["failed to create dir ",PodDir]]),
 			    {error,["cluster dir not created",PodDir,?MODULE_STRING,?LINE]};
 			true->
-			    ok=rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Started connect node: ",ConnectNode,NodeDir]]),
+			    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Started connect node: ",ConnectNode,NodeDir]]),
 			    {ok,ConnectNode,NodeDir,PingResult}
 		    end
 	    end,
