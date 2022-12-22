@@ -22,7 +22,6 @@
 -export([
 
 	 create_pod/3,
-	 create_pod/5,
 	 get_pod/2,
 	 get_pod/3,
 	 
@@ -71,8 +70,7 @@
 start()-> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 stop()-> gen_server:call(?MODULE, {stop},infinity).
 
-create_pod(ParentNode,NodeName,Dir,PaArgs,EnvArgs)->
-    gen_server:call(?MODULE, {create_pod,ParentNode,NodeName,Dir,PaArgs,EnvArgs},infinity).
+
 create_pod(ClusterSpec,HostSpec,Type)->
     gen_server:call(?MODULE, {create_pod,ClusterSpec,HostSpec,Type},infinity).
 
@@ -136,11 +134,8 @@ init([]) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
-handle_call({create_pod,ParentNode,NodeName,Dir,PaArgs,EnvArgs},_From, State) ->
-    Reply=create_pod_node(ParentNode,NodeName,Dir,PaArgs,EnvArgs),
-    {reply, Reply, State};
-    
-handle_call({create_pod,ClusterSpec,_HostSpec,_Type},_From, State) ->
+
+handle_call({create_pod,ClusterSpec,HostSpec,Type},_From, State) ->
     controller_pods(ClusterSpec),
     PresentControllerNodes=present_controller_nodes(ClusterSpec),
     MissingControllerNodes=missing_controller_nodes(ClusterSpec),
@@ -499,55 +494,6 @@ create_worker_pod(ClusterSpec,N,[HostSpec|T],Acc) ->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-create_pod_node(ParentNode,NodeName,Dir,PaArgs,EnvArgs)->
-    {ok,HostName}=rpc:call(ParentNode,net,gethostname,[],5000),
-    Cookie=atom_to_list(rpc:call(ParentNode,erlang,get_cookie,[],5000)),
-    Args=PaArgs++" "++"-setcookie "++Cookie++" "++EnvArgs,
-    Result=case rpc:call(ParentNode,slave,start,[HostName,NodeName,Args],5000) of
-	       {badrpc,Reason}->
-		   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
-		   {badrpc,Reason};
-	       {error,Reason}->
-		   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
-		   {error,Reason};
-	       {ok,SlaveNode}->
-		   true=rpc:call(SlaveNode,code,add_patha,[Dir],5000),
-		   case net_kernel:connect_node(SlaveNode) of
-		       false->
-			   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error failed_connect ",SlaveNode]]),
-			   {error,[failed_connect,SlaveNode]};
-		       ignored->
-			   {error,[ignored,SlaveNode]};
-		       true->
-			   case rpc:call(SlaveNode,file,make_dir,[Dir],5000) of
-			       {badrpc,Reason}->
-				   rpc:call(SlaveNode,init,stop,[],1000),
-				   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
-				   {badrpc,Reason};
-			       {error,Reason}->
-				   rpc:call(SlaveNode,init,stop,[],1000),
-				   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
-				   {error,Reason};
-			       ok->  
-				   rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Pod node suvćcesfully created with Dir  ",SlaveNode,Dir]]),
-				   {ok,SlaveNode,Dir}
-			   end
-		   end
-	   end,
-    Result.
-
-    
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-
 create_pod_node(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,TimeOut)->
     Result=case ops_vm:ssh_create(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,TimeOut) of
 	       {error,Reason}->

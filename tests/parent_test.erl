@@ -9,7 +9,7 @@
 %%% Pod consits beams from all services, app and app and sup erl.
 %%% The setup of envs is
 %%% -------------------------------------------------------------------
--module(console_test).      
+-module(parent_test).      
  
 -export([start/2]).
 %% --------------------------------------------------------------------
@@ -21,12 +21,12 @@
 %% Description: Based on hosts.config file checks which hosts are avaible
 %% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
 %% --------------------------------------------------------------------
-start(ClusterSpec,StartHostSpec)->
+start(ClusterSpec,_StartHostSpec)->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
     ok=setup(ClusterSpec),
-    ok=init_local_db(ClusterSpec,StartHostSpec),
-    ok=create_connect(ClusterSpec,StartHostSpec),
+    ok=load_desired_state_test(ClusterSpec),
+  % ok=create_connect(ClusterSpec,StartHostSpec),
 %    ok=init_test(ClusterSpec,StartHostSpec),
         
   
@@ -37,13 +37,17 @@ start(ClusterSpec,StartHostSpec)->
 
 
 
-init_local_db(ClusterSpec,StartHostSpec)->
-    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-    %% Ensure that config is started proprely , strange!!
-    ok=db_config:create_table(),
-    {atomic,ok}=db_config:set(cluster_spec,ClusterSpec),
-    ClusterSpec=db_config:get(cluster_spec),
-    {ok,_}=connect_server:create_dbase_info(ClusterSpec), 
+
+%% --------------------------------------------------------------------
+%% Function: available_hosts()
+%% Description: Based on hosts.config file checks which hosts are avaible
+%% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
+%% --------------------------------------------------------------------
+load_desired_state_test(ClusterSpec)->
+    ok=parent_server:load_desired_state(ClusterSpec),
+    glurk=db_parent_desired_state:read_all(),
+    
+    
 
     ok.
 %% --------------------------------------------------------------------
@@ -207,9 +211,11 @@ setup(ClusterSpec)->
     pong=nodelog:ping(),
     ok=application:start(db_etcd),
     pong=db_etcd:ping(),
-  
-    {ok,_}=connect_server:start(),
-    pong=connect_server:ping(),
+    
+    ok=db_etcd:install(),
+
+    {ok,_}=parent_server:start(),
+    pong=parent_server:ping(),
     {ok,_}=pod_server:start(),
     pong=pod_server:ping(),
     {ok,_}=appl_server:start(),

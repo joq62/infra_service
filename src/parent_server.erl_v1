@@ -7,7 +7,7 @@
 %%% 
 %%% Created : 10 dec 2012
 %%% -------------------------------------------------------------------
--module(connect_server).
+-module(parent_server).
  
 -behaviour(gen_server).
 
@@ -21,19 +21,19 @@
  
 
 %% External exports
--export([
-	 create_dbase_info/1,
-	 create_connect_nodes/1,
-	 create_connect_node/3,
-	 connect_nodes_info/1
-	]).
 
 
--export([
-	 start_monitoring/1,
-	 wanted_state/1,
-	 heartbeat/0
+
+
+
+-export([   
+	 ini	t_desired_state/1,
+	 create_	node/1,
+	 desired_nodes/1,
+	 active_nodes/1
+
 	]).
+
 -export([
 	 ping/0
 	]).
@@ -68,23 +68,24 @@
 %% call
 start()-> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 stop()-> gen_server:call(?MODULE, {stop},infinity).
+%%---------------------------------------------------------------------
+init_desired_state(ClusterSpec)->
+    gen_server:call(?MODULE,{init_desired_state,ClusterSpec},infinity).
 
-create_dbase_info(ClusterSpec)->
-    gen_server:call(?MODULE,{create_dbase_info,ClusterSpec},infinity).
-connect_nodes_info(ClusterSpec)->
-    gen_server:call(?MODULE,{connect_nodes_info,ClusterSpec},infinity).
+create_node(ParentNode)->
+    gen_server:call(?MODULE,{init_desired_state,ClusterSpec},infinity).
 
-create_connect_nodes(ClusterSpec)->
-    gen_server:call(?MODULE,{create_connect_nodes,ClusterSpec},infinity).
+desired_nodes(ClusterSpec)->
+    gen_server:call(?MODULE,{desired_nodes,ClusterSpec},infinity).
+active_nodes(ClusterSpec)->
+    gen_server:call(?MODULE,{active_nodes,ClusterSpec},infinity).
+
+%%----------------------------------------------------------------------------
+
 
 ping() ->
     gen_server:call(?MODULE, {ping}).
 %% cast
-start_monitoring(ClusterSpec)->
-    gen_server:cast(?MODULE, {start_monitoring,ClusterSpec}).
-
-heartbeat()-> 
-    gen_server:cast(?MODULE, {heartbeat}).
 
 %% ====================================================================
 %% Server functions
@@ -118,6 +119,18 @@ init([]) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
+handle_call({init_desired_state,ClusterSpec},_From, State) ->
+						    
+						    Reply=case lib_parent:load_desired_state(ClusterSpec) of
+	      {error,ReasonList}->
+		  NewState=State,
+		  {error,ReasonList};
+	      {ok,InfoList}->
+		  NewState=State#state{connect_node_maps=InfoList},
+		  {ok,InfoList}
+	  end,		  
+    {reply, Reply, NewState};
+
 handle_call({create_dbase_info,ClusterSpec},_From, State) ->
     Reply=case dbase_info(ClusterSpec) of
 	      {error,ReasonList}->
@@ -319,6 +332,7 @@ create_connect_node(ClusterSpec,PodNode,NodesToConnect)->
     {ok,HostSpec}=db_cluster_instance:read(host_spec,ClusterSpec,PodNode),
     {ok,HostName}=db_host_spec:read(hostname,HostSpec),
     
+
     {ok,PodName}=db_cluster_instance:read(pod_name,ClusterSpec,PodNode),
     {ok,PodDir}=db_cluster_instance:read(pod_dir,ClusterSpec,PodNode),
     PaArgs=" -detached ",
@@ -339,8 +353,22 @@ create_connect_node(ClusterSpec,PodNode,NodesToConnect)->
 			    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["failed to create dir ",PodDir]]),
 			    {error,["cluster dir not created",PodDir,?MODULE_STRING,?LINE]};
 			true->
-			    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Started connect node: ",ConnectNode,NodeDir]]),
-			    {ok,ConnectNode,NodeDir,PingResult}
+			    io:format("PodDir, NodeDir  ~p~n",[{PodDir, NodeDir,?MODULE,?FUNCTION_NAME}]),
+			    ConnectDir=ClusterSpec++"_connect",
+			    PathConnectDir=filename:join(PodDir,ConnectDir),
+			    case rpc:call(ConnectNode,file,make_dir,[PathConnectDir],2000) of
+				{badrpc,Reason}->
+				    rpc:call(ConnectNode,init,stop,[],5000),
+				    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["failed to create dir ",PathConnectDir,Reason]]),
+				    {error,[badrpc,Reason,?MODULE_STRING,?LINE]};
+				{error,Reason}->
+				      rpc:call(ConnectNode,init,stop,[],5000),
+				    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["failed to create dir ",PathConnectDir,Reason]]),
+				    {error,[badrpc,Reason,?MODULE_STRING,?LINE]};
+				ok->
+				    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Started connect node: ",ConnectNode,NodeDir]]),
+				    {ok,ConnectNode,PathConnectDir,PingResult}
+			    end
 		    end
 	    end,
     Result.

@@ -1,0 +1,375 @@
+%%% -------------------------------------------------------------------
+%%% Author  : uabjle
+%%% Description : resource discovery accroding to OPT in Action 
+%%% This service discovery is adapted to 
+%%% Type = application 
+%%% Instance ={ip_addr,{IP_addr,Port}}|{erlang_node,{ErlNode}}
+%%% 
+%%% Created : 10 dec 2012
+%%% -------------------------------------------------------------------
+-module(connect_server).
+ 
+-behaviour(gen_server).
+
+%% --------------------------------------------------------------------
+%% Include files
+%% --------------------------------------------------------------------
+
+%% --------------------------------------------------------------------
+-define(HeartbeatTime,20*1000).
+
+ 
+
+%% External exports
+-export([
+	 create_node/3,
+	 create_dbase_info/1,
+	 create_connect_nodes/1,
+	 create_connect_node/3,
+	 connect_nodes_info/1
+	]).
+
+
+-export([
+	 start_monitoring/1,
+	 wanted_state/1,
+	 heartbeat/0
+	]).
+-export([
+	 ping/0
+	]).
+
+
+-export([
+	 start/0,
+	 stop/0
+	]).
+
+
+%% gen_server callbacks
+
+
+
+-export([init/1, handle_call/3,handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+
+%%-------------------------------------------------------------------
+-record(state,{
+	       cluster_spec,
+	       connect_node_maps,
+	       present_connect_nodes,
+	       missing_connect_nodes
+	      }).
+
+
+%% ====================================================================
+%% External functions
+%% ====================================================================
+
+	    
+%% call
+start()-> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+stop()-> gen_server:call(?MODULE, {stop},infinity).
+
+create_dbase_info(ClusterSpec)->
+    gen_server:call(?MODULE,{create_dbase_info,ClusterSpec},infinity).
+connect_nodes_info(ClusterSpec)->
+    gen_server:call(?MODULE,{connect_nodes_info,ClusterSpec},infinity).
+
+create_node(ClusterSpec,PodNode,NodesToConnect)
+    gen_server:call(?MODULE,{create_node,ClusterSpec,PodNode,NodesToConnect},infinity).
+
+create_connect_nodes(ClusterSpec)->
+    gen_server:call(?MODULE,{create_connect_nodes,ClusterSpec},infinity).
+
+ping() ->
+    gen_server:call(?MODULE, {ping}).
+%% cast
+start_monitoring(ClusterSpec)->
+    gen_server:cast(?MODULE, {start_monitoring,ClusterSpec}).
+
+heartbeat()-> 
+    gen_server:cast(?MODULE, {heartbeat}).
+
+%% ====================================================================
+%% Server functions
+%% ====================================================================
+
+%% --------------------------------------------------------------------
+%% Function: init/1
+%% Description: Initiates the server
+%% Returns: {ok, State}          |
+%%          {ok, State, Timeout} |
+%%          ignore               |
+%%          {stop, Reason}
+%% --------------------------------------------------------------------
+init([]) -> 
+    io:format("Started Server ~p~n",[{?MODULE,?LINE}]),
+    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Servere started"]]),
+
+    {ok, #state{cluster_spec=undefined,
+		connect_node_maps=undefined,
+		missing_connect_nodes=undefined,
+		present_connect_nodes=undefined}}.   
+ 
+
+%% --------------------------------------------------------------------
+%% Function: handle_call/3
+%% Description: Handling call messages
+%% Returns: {reply, Reply, State}          |
+%%          {reply, Reply, State, Timeout} |
+%%          {noreply, State}               |
+%%          {noreply, State, Timeout}      |
+%%          {stop, Reason, Reply, State}   | (terminate/2 is called)
+%%          {stop, Reason, State}            (terminate/2 is called)
+%% --------------------------------------------------------------------
+create_connect_node(ClusterSpec,PodNode,NodesToConnect)
+
+handle_call({create_dbase_info,ClusterSpec},_From, State) ->
+    Reply=case dbase_info(ClusterSpec) of
+	      {error,ReasonList}->
+		  NewState=State,
+		  {error,ReasonList};
+	      {ok,InfoList}->
+		  NewState=State#state{connect_node_maps=InfoList},
+		  {ok,InfoList}
+	  end,		  
+    {reply, Reply, NewState};
+
+handle_call({connect_nodes_info,_ClusterSpec},_From, State) ->
+    Reply=State#state.connect_node_maps,
+    {reply, Reply, State};
+
+handle_call({create_connect_nodes,ClusterSpec},_From, State) ->
+    Reply=connect_nodes(ClusterSpec),
+    {reply, Reply, State};
+
+handle_call({ping},_From, State) ->
+    Reply=pong,
+    {reply, Reply, State};
+
+handle_call(Request, From, State) ->
+    Reply = {unmatched_signal,?MODULE,Request,From},
+    {reply, Reply, State}.
+
+%% --------------------------------------------------------------------
+%% Function: handle_cast/2
+%% Description: Handling cast messages
+%% Returns: {noreply, State}          |
+%%          {noreply, State, Timeout} |
+%%          {stop, Reason, State}            (terminate/2 is called)
+%% --------------------------------------------------------------------
+handle_cast({start_monitoring,ClusterSpec}, State) ->
+    NewState=State#state{
+	       cluster_spec=ClusterSpec,
+	       present_connect_nodes=[],
+	       missing_connect_nodes=[]
+	      },
+    spawn(fun()->hbeat(ClusterSpec) end),
+    {noreply, NewState};
+
+
+handle_cast({heartbeat}, State) ->
+    NewPresentConnectNodes=present_connect_nodes(State#state.cluster_spec),
+    Started=[Node||Node<-NewPresentConnectNodes,
+		   false==lists:member(Node,State#state.present_connect_nodes)],
+    case Started of
+	[]->
+	    no_change;
+		Started ->
+	    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Started connect nodes : ",Started]])
+    end,
+    
+    NewMissingConnectNodes=missing_connect_nodes(State#state.cluster_spec),
+    Stopped=[Node||Node<-NewMissingConnectNodes,
+		   false==lists:member(Node,State#state.missing_connect_nodes)],
+    case Stopped of
+	[]->
+	    no_change;
+	Stopped ->
+	    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Stopped connect nodes : ",Stopped]])
+    end,
+    
+    NewState=State#state{present_connect_nodes=NewPresentConnectNodes,
+			 missing_connect_nodes=NewMissingConnectNodes},
+    
+    spawn(fun()->hbeat(State#state.cluster_spec) end),
+    {noreply, NewState};
+
+handle_cast(Msg, State) ->
+    io:format("unmatched match cast ~p~n",[{Msg,?MODULE,?LINE}]),
+    {noreply, State}.
+
+%% --------------------------------------------------------------------
+%% Function: handle_info/2
+%% Description: Handling all non call/cast messages
+%% Returns: {noreply, State}          |
+%%          {noreply, State, Timeout} |
+%%          {stop, Reason, State}            (terminate/2 is called)
+%% --------------------------------------------------------------------
+handle_info({ssh_cm,_,_}, State) ->
+    {noreply, State};
+
+handle_info(Info, State) ->
+    io:format("unmatched match~p~n",[{Info,?MODULE,?LINE}]), 
+    {noreply, State}.
+
+%% --------------------------------------------------------------------
+%% Function: terminate/2
+%% Description: Shutdown the server
+%% Returns: any (ignored by gen_server)
+%% --------------------------------------------------------------------
+terminate(_Reason, _State) ->
+    ok.
+
+%% --------------------------------------------------------------------
+%% Func: code_change/3
+%% Purpose: Convert process state when code is changed
+%% Returns: {ok, NewState}
+%% --------------------------------------------------------------------
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+%% --------------------------------------------------------------------
+%%% Internal functions
+%% --------------------------------------------------------------------
+%% --------------------------------------------------------------------
+%% Function: terminate/2
+%% Description: Shutdown the server
+%% Returns: any (ignored by gen_server)
+%% --------------------------------------------------------------------
+hbeat(ClusterSpec)->
+    rpc:call(node(),?MODULE,wanted_state,[ClusterSpec],30*1000), 
+    rpc:cast(node(),?MODULE,heartbeat,[]).
+%% --------------------------------------------------------------------
+%% Function: terminate/2
+%% Description: Shutdown the server
+%% Returns: any (ignored by gen_server)
+%% --------------------------------------------------------------------
+wanted_state(ClusterSpec)->
+    Connect=[{Node,db_cluster_instance:read(pod_dir,ClusterSpec,Node)}||Node<-present_connect_nodes(ClusterSpec)],
+    ConnectNoDirs=[Node||{Node,{ok,PodDir}}<-Connect,
+			    true/=rpc:call(Node,filelib,is_dir,[PodDir],2000)],
+    [rpc:call(Node,init,stop,[],2000)||Node<-ConnectNoDirs],
+    MissingConnectNodes=lists:append(ConnectNoDirs,missing_connect_nodes(ClusterSpec)),  
+    NodesToConnect=db_cluster_instance:nodes(connect,ClusterSpec),
+    [create_connect_node(ClusterSpec,PodNode,NodesToConnect)||PodNode<-MissingConnectNodes],
+    ok.
+
+
+%% --------------------------------------------------------------------
+%% Function: terminate/2
+%% Description: Shutdown the server
+%% Returns: any (ignored by gen_server)
+%% --------------------------------------------------------------------
+missing_connect_nodes(ClusterSpec)->
+    [Node||Node<-db_cluster_instance:nodes(connect,ClusterSpec), 
+	   pang=:=net_adm:ping(Node)].
+present_connect_nodes(ClusterSpec)->
+    [Node||Node<-db_cluster_instance:nodes(connect,ClusterSpec), 
+	   pong=:=net_adm:ping(Node)].
+%% --------------------------------------------------------------------
+%% Function: terminate/2
+%% Description: Shutdown the server
+%% Returns: any (ignored by gen_server)
+%% --------------------------------------------------------------------
+dbase_info(ClusterSpec)->
+    {ok,ControllerHostSpecs}=db_cluster_spec:read(controller_host_specs,ClusterSpec),
+    {ok,WorkerHostSpecs}=db_cluster_spec:read(worker_host_specs,ClusterSpec),
+    ConnectHostSpecs=list_duplicates:remove(lists:append(ControllerHostSpecs,WorkerHostSpecs)),
+    dbase_info(ConnectHostSpecs,ClusterSpec,[]).
+    
+dbase_info([],_ClusterSpec,Acc)->
+    ReasonList=[Reason||{error,Reason}<-Acc],
+    Result=case ReasonList of 
+	       []->
+		   Info=[Info||{ok,Info}<-Acc],
+		   {ok,Info};
+	       _ ->
+		   {error,ReasonList}
+	   end,
+    Result;
+dbase_info([HostSpec|T],ClusterSpec,Acc)->
+    {ok,ClusterDir}=db_cluster_spec:read(dir,ClusterSpec),
+    {ok,HostName}=db_host_spec:read(hostname,HostSpec),
+    PodName=ClusterSpec++"_connect",
+    PodNode=list_to_atom(PodName++"@"++HostName),
+    PodDir=ClusterDir,
+    Type=connect,
+    Status=candidate,
+    NewAcc=case db_cluster_instance:create(ClusterSpec,Type,PodName,PodNode,PodDir,HostSpec,Status) of
+	       {atomic,ok}->
+		   [{ok,#{pod_node=>PodNode,pod_dir=>PodDir,hostname=>HostName}}|Acc];
+	       Reason->
+		   [{error,Reason}|Acc]
+	   end,
+    dbase_info(T,ClusterSpec,NewAcc).
+     
+%% --------------------------------------------------------------------
+%% Function: terminate/2
+%% Description: Shutdown the server
+%% Returns: any (ignored by gen_server)
+%% --------------------------------------------------------------------
+-define(TimeOut,10*1000).
+
+connect_nodes(ClusterSpec)->
+    NodesToConnect=db_cluster_instance:nodes(connect,ClusterSpec),
+    _StoppedNodes=[{Node,rpc:call(Node,init,stop,[],2000)}||Node<-NodesToConnect],
+    %io:format("StoppedNodes ~p~n",[{StoppedNodes,?MODULE,?FUNCTION_NAME}]),
+    MissingConnectNodes=[Node||Node<-NodesToConnect, 
+			       pang=:=net_adm:ping(Node)],
+    [create_connect_node(ClusterSpec,PodNode,NodesToConnect)||PodNode<-MissingConnectNodes].
+		  
+    
+create_connect_node(ClusterSpec,PodNode,NodesToConnect)->
+    {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
+    {ok,HostSpec}=db_cluster_instance:read(host_spec,ClusterSpec,PodNode),
+    {ok,HostName}=db_host_spec:read(hostname,HostSpec),
+    
+
+    {ok,PodName}=db_cluster_instance:read(pod_name,ClusterSpec,PodNode),
+    {ok,PodDir}=db_cluster_instance:read(pod_dir,ClusterSpec,PodNode),
+    PaArgs=" -detached ",
+    EnvArgs=" ",
+    Result= case ops_vm:ssh_create(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,NodesToConnect,?TimeOut) of
+		{error,Reason}->
+		    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["failed to create connect node ",error,Reason]]),
+		    {error,Reason};
+		{ok,ConnectNode,NodeDir,PingResult}->
+		    pong=net_adm:ping(ConnectNode),
+		    case rpc:call(ConnectNode,filelib,is_dir,[PodDir],2000) of
+			{badrpc,Reason}->
+			    rpc:call(ConnectNode,init,stop,[],5000),
+			    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["failed to create dir ",PodDir,Reason]]),
+			    {error,[badrpc,Reason,?MODULE_STRING,?LINE]};
+			false->
+			    rpc:call(ConnectNode,init,stop,[],5000),
+			    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["failed to create dir ",PodDir]]),
+			    {error,["cluster dir not created",PodDir,?MODULE_STRING,?LINE]};
+			true->
+			    io:format("PodDir, NodeDir  ~p~n",[{PodDir, NodeDir,?MODULE,?FUNCTION_NAME}]),
+			    ConnectDir=ClusterSpec++"_connect",
+			    PathConnectDir=filename:join(PodDir,ConnectDir),
+			    case rpc:call(ConnectNode,file,make_dir,[PathConnectDir],2000) of
+				{badrpc,Reason}->
+				    rpc:call(ConnectNode,init,stop,[],5000),
+				    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["failed to create dir ",PathConnectDir,Reason]]),
+				    {error,[badrpc,Reason,?MODULE_STRING,?LINE]};
+				{error,Reason}->
+				      rpc:call(ConnectNode,init,stop,[],5000),
+				    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["failed to create dir ",PathConnectDir,Reason]]),
+				    {error,[badrpc,Reason,?MODULE_STRING,?LINE]};
+				ok->
+				    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Started connect node: ",ConnectNode,NodeDir]]),
+				    {ok,ConnectNode,PathConnectDir,PingResult}
+			    end
+		    end
+	    end,
+    Result.
+
+%% --------------------------------------------------------------------
+%% Function: terminate/2
+%% Description: Shutdown the server
+%% Returns: any (ignored by gen_server)
+%% --------------------------------------------------------------------
+
+
