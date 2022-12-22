@@ -69,9 +69,7 @@ ping() ->
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
 init([]) -> 
-    {ok,ClusterSpec}=application:get_env(infra_service_app,cluster_spec),
- %   {ok,ClusterDir}=db_cluster_spec:read(dir,ClusterSpec),
-    % Install nodelog
+    ClusterSpec=db_config:get(cluster_spec),
 
     LogDir="log_dir",
     LogFile="logs1.logs",

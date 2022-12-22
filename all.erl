@@ -10,27 +10,36 @@
 %%% The setup of envs is
 %%% -------------------------------------------------------------------
 -module(all).      
-    
- 
--export([start/1]).
+  
+-export([start/0]).
 %% --------------------------------------------------------------------
 %% Include files
 %% --------------------------------------------------------------------
 
+
 %% --------------------------------------------------------------------
 %% Function: available_hosts()
 %% Description: Based on hosts.config file checks which hosts are avaible
 %% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
 %% --------------------------------------------------------------------
-start([ClusterSpec])->
+start()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-    
-    ok=setup(ClusterSpec),
- %   ok=cluster_start:start(ClusterSpec),
-       
+
+    ok=setup(),
+
+    ok=config_tests:start(),
+    ok=cluster_spec_tests:start(),
+    ok=cluster_instance_tests:start(),
+    ok=appl_deployment_tests:start(),
+    ok=appl_instance_tests:start(),    
+    ok=host_spec_tests:start(),
+
+ 
+   
+   
     io:format("Stop OK !!! ~p~n",[{?MODULE,?FUNCTION_NAME}]),
- %   timer:sleep(2000),
- %  init:stop(),
+    timer:sleep(2000),
+   init:stop(),
     ok.
 
 
@@ -40,40 +49,28 @@ start([ClusterSpec])->
 %% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
 %% --------------------------------------------------------------------
 
+
+
 %% --------------------------------------------------------------------
 %% Function: available_hosts()
 %% Description: Based on hosts.config file checks which hosts are avaible
 %% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
 %% --------------------------------------------------------------------
+
+%% --------------------------------------------------------------------
+%% Function: available_hosts()
+%% Description: Based on hosts.config file checks which hosts are avaible
+%% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
+%% --------------------------------------------------------------------
+
 
 setup()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-  
-    ok.
-
-
-%% Function: available_hosts()
-%% Description: Based on hosts.config file checks which hosts are avaible
-%% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
-%% --------------------------------------------------------------------
-
-setup(ClusterSpec)->
-    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-
     ok=application:start(common),
     pong=common:ping(),
     ok=application:start(resource_discovery),
     pong=rd:ping(),
-    ok=application:start(nodelog),
-    pong=nodelog:ping(),
     ok=application:start(db_etcd),
     pong=db_etcd:ping(),
-  
-    ok=db_config:create_table(),
-    {atomic,ok}=db_config:set(cluster_spec,ClusterSpec),
-    ClusterSpec=db_config:get(cluster_spec),
-
-    ok=application:start(infra_service),
-    pong=infra_service:ping(),
     
     ok.

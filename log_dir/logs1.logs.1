@@ -1,4 +1,16 @@
-2022-12-20T18:44:28.336676+01:00 | infra_service_server | 101 | notice | "Servere started"
-2022-12-20T18:44:39.172713+01:00 | pod_server | 411 | warning | ["Failed to create ",'1_prototype_c201_controller@c201', [enoent,ops_vm,ssh_create,69]]
-2022-12-20T18:44:46.880283+01:00 | pod_server | 449 | warning | ["Failed to create ",'2_prototype_c201_worker@c201', [enoent,ops_vm,ssh_create,69]]
-2022-12-20T18:44:54.540436+01:00 | pod_server | 449 | warning | ["Failed to create ",'1_prototype_c201_worker@c201', [enoent,ops_vm,ssh_create,69]]
+2022-12-22T07:04:38.252780+01:00 | connect_server | 173 | notice | ["Started connect nodes : ",[prototype_c201_connect@c201]]
+2022-12-22T07:04:44.513005+01:00 | connect_server | 342 | notice | ["Started connect node: ",prototype_c201_connect@c201,"prototype_c201"]
+2022-12-22T07:04:47.959368+01:00 | pod_server | 424 | notice | ["Controller created ",'1_prototype_c201_controller@c201']
+2022-12-22T07:04:49.932768+01:00 | connect_server | 342 | notice | ["Started connect node: ",prototype_c201_connect@c201,"prototype_c201"]
+2022-12-22T07:04:56.953856+01:00 | pod_server | 462 | notice | ["Worker created ",'2_prototype_c201_worker@c201']
+2022-12-22T07:05:05.410919+01:00 | pod_server | 462 | notice | ["Worker created ",'1_prototype_c201_worker@c201']
+2022-12-22T07:05:05.445663+01:00 | appl_server | 292 | warning | {error,[eexist,"infras_service",db_appl_spec,57]}
+2022-12-22T07:05:05.445848+01:00 | appl_server | 476 | warning | [error_creating_appl_at_host,"infras_service","c201", [eexist,"infras_service",db_appl_spec,57]]
+2022-12-22T07:05:08.250776+01:00 | appl_server | 335 | notice | ["application created ","math",'2_prototype_c201_worker@c201']
+2022-12-22T07:05:08.251139+01:00 | appl_server | 479 | notice | [appl_created_host,"math","c201",'2_prototype_c201_worker@c201']
+2022-12-22T07:05:11.055675+01:00 | appl_server | 335 | notice | ["application created ","math",'1_prototype_c201_worker@c201']
+2022-12-22T07:05:11.056008+01:00 | appl_server | 479 | notice | [appl_created_host,"math","c201",'1_prototype_c201_worker@c201']
+2022-12-22T07:05:11.057304+01:00 | appl_server | 292 | warning | {error,[eexist,"db_dummy_application",db_appl_spec,57]}
+2022-12-22T07:05:11.057564+01:00 | appl_server | 488 | warning | [error_creating_appl_at_host,"db_dummy_application","c201", [eexist,"db_dummy_application",db_appl_spec,57]]
+2022-12-22T07:05:12.674784+01:00 | hw_conbee_app_server | 70 | notice | "Servere started"
+2022-12-22T07:05:18.334971+01:00 | hw_conbee_server | 81 | notice | ["Server started",ip_addr,"172.17.0.2",ip_port,80,crypto,"4B3F1542C5"]

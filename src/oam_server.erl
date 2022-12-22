@@ -69,8 +69,8 @@ stop()-> gen_server:call(?MODULE, {stop},infinity).
 init([]) -> 
     
   
-    {ok,ClusterSpec}=application:get_env(infra_service_app,cluster_spec),
-    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,"Servere started"]),
+    ClusterSpec=db_config:get(cluster_spec),
+    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Server started with Args ",ClusterSpec]]),
    
     {ok, #state{cluster_spec=ClusterSpec}}.   
  
