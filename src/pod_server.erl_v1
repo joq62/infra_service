@@ -511,7 +511,46 @@ create_pod_node(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,TimeO
 				   rpc:call(PodNode,init,stop,[],1000),
 				   {error,["Dir not exists :",NodeDir, ?MODULE,?LINE]};
 			       true->
-				   {ok,PodNode,NodeDir,PingResult}
+				   ApplSpec="pod_app",
+				   {ok,PodApplGitPath}=db_appl_spec:read(gitpath,ApplSpec),
+				   ApplDir=filename:join([PodDir,ApplSpec]),
+				   case rpc:call(PodNode,file,make_dir,[ApplDir],5000) of
+				       {badrpc,Reason}->
+					   rpc:call(PodNode,init,stop,[],1000),
+					   {error,[badrpc,Reason,?MODULE,?LINE]};
+				       {error,Reason}->
+					   rpc:call(PodNode,init,stop,[],1000),
+					   {error,[Reason,?MODULE,?LINE]};
+				       ok->
+					   case appl:git_clone_to_dir(PodNode,PodApplGitPath,ApplDir)of
+					       {error,Reason}->
+						   rpc:call(PodNode,init,stop,[],1000),
+						   {error,[Reason,?MODULE,?LINE]};
+					       {ok,_}->
+						   {ok,PodApp}=db_appl_spec:read(app,ApplSpec),
+						   ApplEbin=filename:join([ApplDir,"ebin"]),
+						   Paths=[ApplEbin],
+						   case appl:load(PodNode,PodApp,Paths) of
+						       {error,Reason}->
+							   rpc:call(PodNode,init,stop,[],1000),
+							   {error,[Reason,?MODULE,?LINE]};
+						       ok->
+							   case appl:start(PodNode,PodApp) of
+							       {error,Reason}->
+								   rpc:call(PodNode,init,stop,[],1000),
+								   {error,[Reason,?MODULE,?LINE]};
+							       ok->
+								   {ok,LocalTypeList}=db_appl_spec:read(local_type,ApplSpec),
+								   {ok,TargetTypeList}=db_appl_spec:read(target_type,ApplSpec),
+								   [rpc:call(PodNode,rd,add_local_resource,[LocalType,PodNode],5000)||LocalType<-LocalTypeList],
+								   [rpc:call(PodNode,rd,add_target_resource_type,[TargetType],5000)||TargetType<-TargetTypeList],
+								   rpc:call(PodNode,rd,trade_resources,[],5000),
+								   timer:sleep(2000),
+								   {ok,PodNode,NodeDir,PingResult}
+							   end
+						   end						       
+					   end
+				   end
 			   end
 		   end
 	   end,

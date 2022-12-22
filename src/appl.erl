@@ -172,21 +172,6 @@ load(Node,App,Paths)->
 %% Description: Initiate the eunit tests, set upp needed processes etc
 %% Returns: non
 %% --------------------------------------------------------------------
-stop(Node,App)->
-    rpc:call(Node,application,stop,[App],5000).
-%% --------------------------------------------------------------------
-%% Function:start/0 
-%% Description: Initiate the eunit tests, set upp needed processes etc
-%% Returns: non
-%% --------------------------------------------------------------------
-unload(Node,App,Dir)->
-    rpc:call(Node,application,unload,[App],2*5000), 
-    rpc:call(Node,file,del_dir_r,[Dir],5000).
-%% --------------------------------------------------------------------
-%% Function:start/0 
-%% Description: Initiate the eunit tests, set upp needed processes etc
-%% Returns: non
-%% --------------------------------------------------------------------
 -define(TimeOut,2*5000).
 start(Node,App)->
     start(Node,App,?TimeOut).
@@ -200,6 +185,21 @@ start(Node,App,TimeOut)->
 	ok->
 	    ok
     end.
+%% --------------------------------------------------------------------
+%% Function:start/0 
+%% Description: Initiate the eunit tests, set upp needed processes etc
+%% Returns: non
+%% --------------------------------------------------------------------
+stop(Node,App)->
+    rpc:call(Node,application,stop,[App],5000).
+%% --------------------------------------------------------------------
+%% Function:start/0 
+%% Description: Initiate the eunit tests, set upp needed processes etc
+%% Returns: non
+%% --------------------------------------------------------------------
+unload(Node,App,Dir)->
+    rpc:call(Node,application,unload,[App],2*5000), 
+    rpc:call(Node,file,del_dir_r,[Dir],5000).
 
 %% --------------------------------------------------------------------
 %% Function:start/0 

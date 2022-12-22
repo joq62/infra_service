@@ -23,6 +23,7 @@
 -export([
 	 deploy_appls/1,
 	 new/4,
+	 new_on_pod/4,
 	 load_start/5,
 	 delete/3,
 	 present_apps/1,
@@ -68,6 +69,8 @@ stop()-> gen_server:call(?MODULE, {stop},infinity).
 
 new(ApplSpec,HostSpec,ClusterSpec,TimeOut)->
     gen_server:call(?MODULE, {new,ApplSpec,HostSpec,ClusterSpec,TimeOut},infinity).
+new_on_pod(ApplSpec,PodNode,ClusterSpec,TimeOut)->
+    gen_server:call(?MODULE, {new_on_pod,ApplSpec,PodNode,ClusterSpec,TimeOut},infinity).
 
 load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut)->
     gen_server:call(?MODULE, {load_start,ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut},infinity).
@@ -129,6 +132,9 @@ init([]) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
+handle_call({new_on_pod,ApplSpec,PodNode,ClusterSpec,TimeOut},_From, State) ->
+    Reply=do_new_on_pod(ApplSpec,PodNode,ClusterSpec,TimeOut),
+    {reply, Reply, State};
 
 handle_call({load_start,ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut},_From, State) ->
     Reply=do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut),
@@ -291,6 +297,38 @@ appl_del(ApplSpec,PodNode,ClusterSpec)->
 		   end
 	   end,
     Result.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+
+do_new_on_pod(ApplSpec,PodNode,ClusterSpec,TimeOut)->
+    {ok,PodDir}=db_cluster_instance:read(pod_dir,ClusterSpec,PodNode),
+    {ok,HostSpec}=db_cluster_instance:read(host_spec,ClusterSpec,PodNode),
+    {ok,PodApplGitPath}=db_appl_spec:read(gitpath,ApplSpec),
+    ApplDir=filename:join([PodDir,ApplSpec]),
+    %% set application envs
+    {ok,ApplicationConfig}=db_host_spec:read(application_config,HostSpec),  
+    _SetEnvResult=[rpc:call(PodNode,application,set_env,[[Config]],5000)||Config<-ApplicationConfig],
+    Result=case do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut) of
+	       {error,Reason}->
+		   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
+		   {error,Reason};
+	       ok->
+		   {atomic,ok}=db_appl_instance:create(ClusterSpec,ApplSpec,PodNode,HostSpec,{date(),time()}),
+		   {ok,LocalTypeList}=db_appl_spec:read(local_type,ApplSpec),
+		   [rpc:call(PodNode,rd,add_local_resource,[LocalType,PodNode],5000)||LocalType<-LocalTypeList],
+						%   [rd:add_target_resource_type(LocalType)||LocalType<-LocalTypeList],
+		   {ok,TargetTypeList}=db_appl_spec:read(target_type,ApplSpec),
+		   [rpc:call(PodNode,rd,add_target_resource_type,[TargetType],5000)||TargetType<-TargetTypeList],
+		   rpc:call(PodNode,rd,trade_resources,[],5000),
+		   timer:sleep(2000),
+		   rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["application created ",ApplSpec,PodNode]]),
+		   ok
+	   end,
+    Result.
 %% --------------------------------------------------------------------
 %% Function: terminate/2
 %% Description: Shutdown the server
@@ -327,6 +365,9 @@ appl_new(ApplSpec,HostSpec,ClusterSpec,TimeOut)->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
+
+
+
 do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut)->
     Result= case rpc:call(PodNode,file,make_dir,[ApplDir],5000) of
 		{error,Reason}->

@@ -312,9 +312,9 @@ connect_nodes(ClusterSpec)->
     MissingConnectNodes=[Node||Node<-NodesToConnect, 
 			       pang=:=net_adm:ping(Node)],
     [create_connect_node(ClusterSpec,PodNode,NodesToConnect)||PodNode<-MissingConnectNodes].
+		  
     
 create_connect_node(ClusterSpec,PodNode,NodesToConnect)->
- 
     {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
     {ok,HostSpec}=db_cluster_instance:read(host_spec,ClusterSpec,PodNode),
     {ok,HostName}=db_host_spec:read(hostname,HostSpec),

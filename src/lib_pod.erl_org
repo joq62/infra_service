@@ -1,0 +1,147 @@
+%%%-------------------------------------------------------------------
+%%% @author c50 <joq62@c50>
+%%% @copyright (C) 2022, c50
+%%% @doc
+%%%
+%%% @end
+%%% Created : 22 Dec 2022 by c50 <joq62@c50>
+%%%-------------------------------------------------------------------
+-module(lib_pod).
+
+%% API
+-export([]).
+
+%%%===================================================================
+%%% API
+%%%===================================================================
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+heartbeat()->
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+
+missing_controller_nodes(ClusterSpec)->
+   
+    [Node||Node<-db_cluster_instance:nodes(controller,ClusterSpec), 
+	   pang=:=net_adm:ping(Node)].
+present_controller_nodes(ClusterSpec)->
+    [Node||Node<-db_cluster_instance:nodes(controller,ClusterSpec), 
+	   pong=:=net_adm:ping(Node)].
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+
+missing_worker_nodes(ClusterSpec)->
+    [Node||Node<-db_cluster_instance:nodes(worker,ClusterSpec), 
+	   pang=:=net_adm:ping(Node)].
+present_worker_nodes(ClusterSpec)->
+    [Node||Node<-db_cluster_instance:nodes(worker,ClusterSpec), 
+	   pong=:=net_adm:ping(Node)].
+
+
+
+
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
+
+%%% @author c50 <joq62@c50>
+%%% @copyright (C) 2022, c50
+%%% @doc
+%%%
+%%% @end
+%%% Created : 22 Dec 2022 by c50 <joq62@c50>
+
+restart_pod(ClusterSpec,PodNode)->
+    {ok,HostSpec}=db_cluster_instance:read(host_spec,ClusterSpec,PodNode),
+    {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
+    ConnectNodes=db_cluster_instance:nodes(connect,ClusterSpec),
+    
+    {ok,HostName}=db_host_spec:read(hostname,HostSpec),
+    {ok,PodName}=db_cluster_instance:read(pod_name,ClusterSpec,PodNode),
+    rpc:call(PodNode,init,stop,[]),
+    {ok,PodDir}=db_cluster_instance:read(pod_dir,ClusterSpec,PodNode),
+    PaArgs=" -detached ",
+    EnvArgs=" ",
+    create_pod_node(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,?TimeOut).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+
+create_pod_node(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,TimeOut)->
+    Result=case ops_vm:ssh_create(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,TimeOut) of
+	       {error,Reason}->
+		   {error,[Reason,?MODULE,?LINE]};
+	       {ok,PodNode,NodeDir,PingResult}->
+		   case net_adm:ping(PodNode) of
+		       pang->
+			   {error,["couldnt connect to PodNode :",PodNode, ?MODULE,?LINE]};
+		       pong->
+			   case rpc:call(PodNode,filelib,is_dir,[NodeDir],5000) of
+			       {badrpc,Reason}->
+				   rpc:call(PodNode,init,stop,[],1000),
+				   {error,[badrpc,Reason,?MODULE,?LINE]};
+			       false->
+				   rpc:call(PodNode,init,stop,[],1000),
+				   {error,["Dir not exists :",NodeDir, ?MODULE,?LINE]};
+			       true->
+				   ApplSpec="pod_app",
+				   {ok,PodApplGitPath}=db_appl_spec:read(gitpath,ApplSpec),
+				   ApplDir=filename:join([PodDir,ApplSpec]),
+				   case rpc:call(PodNode,file,make_dir,[ApplDir],5000) of
+				       {badrpc,Reason}->
+					   rpc:call(PodNode,init,stop,[],1000),
+					   {error,[badrpc,Reason,?MODULE,?LINE]};
+				       {error,Reason}->
+					   rpc:call(PodNode,init,stop,[],1000),
+					   {error,[Reason,?MODULE,?LINE]};
+				       ok->
+					   case appl:git_clone_to_dir(PodNode,PodApplGitPath,ApplDir)of
+					       {error,Reason}->
+						   rpc:call(PodNode,init,stop,[],1000),
+						   {error,[Reason,?MODULE,?LINE]};
+					       {ok,_}->
+						   {ok,PodApp}=db_appl_spec:read(app,ApplSpec),
+						   ApplEbin=filename:join([ApplDir,"ebin"]),
+						   Paths=[ApplEbin],
+						   case appl:load(PodNode,PodApp,Paths) of
+						       {error,Reason}->
+							   rpc:call(PodNode,init,stop,[],1000),
+							   {error,[Reason,?MODULE,?LINE]};
+						       ok->
+							   case appl:start(PodNode,PodApp) of
+							       {error,Reason}->
+								   rpc:call(PodNode,init,stop,[],1000),
+								   {error,[Reason,?MODULE,?LINE]};
+							       ok->
+								   {ok,LocalTypeList}=db_appl_spec:read(local_type,ApplSpec),
+								   {ok,TargetTypeList}=db_appl_spec:read(target_type,ApplSpec),
+								   [rpc:call(PodNode,rd,add_local_resource,[LocalType,PodNode],5000)||LocalType<-LocalTypeList],
+								   [rpc:call(PodNode,rd,add_target_resource_type,[TargetType],5000)||TargetType<-TargetTypeList],
+								   rpc:call(PodNode,rd,trade_resources,[],5000),
+								   timer:sleep(2000),
+								   {ok,PodNode,NodeDir,PingResult}
+							   end
+						   end						       
+					   end
+				   end
+			   end
+		   end
+	   end,
+    Result.
+
+
