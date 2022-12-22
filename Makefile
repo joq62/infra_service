@@ -1,6 +1,6 @@
 all:
 	rm -rf  *~ */*~ src/*.beam tests/*.beam tests_ebin erl_cra*;
-	rm -rf _build logs log *.pod_dir;
+	rm -rf _build logs log log_dir  *.pod_dir;
 	rm -rf _build tests_ebin ebin;
 	rm -rf Mnesia.*;
 	rm -rf *.dir;
@@ -8,6 +8,7 @@ all:
 	rm -rf common;
 	rm -rf resource_discovery;
 	rm -rf nodelog;
+	rm -rf db_etcd;
 #	tests 
 	mkdir tests_ebin;
 	erlc -I include -o tests_ebin tests/*.erl;
@@ -40,6 +41,10 @@ clean:
 	rm -rf ebin;
 	rm -rf Mnesia.*;
 	rm -rf *.dir;
+	rm -rf common;
+	rm -rf resource_discovery;
+	rm -rf nodelog;
+	rm -rf db_etcd;
 
 eunit:
 	rm -rf  *~ */*~ src/*.beam tests/*.beam
