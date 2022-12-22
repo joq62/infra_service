@@ -12,6 +12,7 @@ all:
 #	tests 
 	mkdir tests_ebin;
 	erlc -I include -o tests_ebin tests/*.erl;
+	rm -rf tests_ebin;
 #  	dependencies
 	mkdir ebin;
 	rebar3 compile;	
