@@ -18,7 +18,11 @@
 
 %% External exports
 -export([
-	 load_desired_state/1
+	 create_node/1,
+	 load_desired_state/1,
+	 desired_nodes/0,
+	 active_nodes/0,
+	 stopped_nodes/0
 
 	]).
 
@@ -26,6 +30,73 @@
 %% ====================================================================
 %% External functions
 %% ====================================================================
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+desired_nodes()->
+    Result=case db_parent_desired_state:get_all_id() of
+	       {error,Reason}->
+		   {error,Reason};
+	       []->
+		   {error,["No desired parent nodes are declared: "]};
+	       Nodes->
+		   {ok,Nodes}
+	   end,
+    Result.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+active_nodes()->
+    AllParentNodes=db_parent_desired_state:get_all_id(),
+    [Parent1|_]=AllParentNodes,
+    {ok,ClusterSpec}=db_parent_desired_state:read(cluster_spec,Parent1),
+    {ok,RootDir}=db_cluster_spec:read(root_dir,ClusterSpec),
+    RunningNodes=[Node||Node<-AllParentNodes,
+			pong==net_adm:ping(Node)],
+    ActiveNodes=[Node||Node<-RunningNodes,
+		       rpc:call(Node,filelib,is_dir,[RootDir],5000)],
+    [rpc:call(Node,init,stop,[],3000)||Node<-RunningNodes,
+				       false==lists:member(Node,ActiveNodes)],
+    {ok,ActiveNodes}.
+    %%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+stopped_nodes()->
+    AllParentNodes=db_parent_desired_state:get_all_id(),
+    {ok,ActiveNodes}=active_nodes(),
+    StoppedNodes=[Node||Node<-AllParentNodes,
+			false==lists:member(Node,ActiveNodes)],
+    {ok,StoppedNodes}.
+    
+    
+    
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+create_node(ParentNode)->
+    {ok,HostSpec}=db_parent_desired_state:read(host_spec,ParentNode),
+    {ok,NodeName}=db_parent_desired_state:read(node_name,ParentNode),
+    {ok,ClusterSpec}=db_parent_desired_state:read(cluster_spec,ParentNode),
+    {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
+    EnvArgs=" -detached ",
+    PaArgs=" ",
+    TimeOut=10*1000,
+    Result=case ops_ssh:create(HostSpec,NodeName,Cookie,PaArgs,EnvArgs,TimeOut) of
+	       {error,Reason}->
+		   {error,Reason};
+	       {ok,ParentNode}->
+		   ok
+	   end,
+    Result.    
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec

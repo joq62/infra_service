@@ -30,7 +30,8 @@
 	 load_desired_state/1,
 	 create_node/1,
 	 desired_nodes/0,
-	 active_nodes/0
+	 active_nodes/0,
+	 stopped_nodes/0
 
 	]).
 -export([
@@ -75,6 +76,9 @@ desired_nodes()->
     gen_server:call(?MODULE,{desired_nodes},infinity).
 active_nodes()->
     gen_server:call(?MODULE,{active_nodes},infinity).
+stopped_nodes()->
+    gen_server:call(?MODULE,{stopped_nodes},infinity).
+
 
 %%----------------------------------------------------------------------------
 
@@ -115,6 +119,7 @@ init([]) ->
 handle_call({load_desired_state,ClusterSpec},_From, State) ->
     Reply=case State#state.cluster_spec of
 	      undefined->
+		  ok=db_parent_desired_state:create_table(),
 		  case lib_parent:load_desired_state(ClusterSpec) of
 		      ok->
 			  rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK: initiation of desired state : ",ClusterSpec]]),
@@ -158,12 +163,12 @@ handle_call({desired_nodes},_From, State) ->
 	      undefined->
 		  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: Not initiated : ",undefined]]),
 		  {error,["Not initiated : ",undefined]};
-	      ClusterSpec->
-		  case lib_parent:desired_nodes(ClusterSpec) of
+	      _ClusterSpec->
+		  case lib_parent:desired_nodes() of
 		      {error,Reason}->
 			  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: desired nodes : ",Reason]]),
 			  {error,Reason};
-		      Nodes->
+		      {ok,Nodes}->
 			  {ok,Nodes}
 		  end
 	  end,
@@ -174,12 +179,28 @@ handle_call({active_nodes},_From, State) ->
 	      undefined->
 		  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: Not initiated : ",undefined]]),
 		  {error,["Not initiated : ",undefined]};
-	      ClusterSpec->
-		  case lib_parent:active_nodes(ClusterSpec) of
+	      _ClusterSpec->
+		  case lib_parent:active_nodes() of
 		      {error,Reason}->
 			  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: active nodes : ",Reason]]),
 			  {error,Reason};
-		      Nodes->
+		      {ok,Nodes}->
+			  {ok,Nodes}
+		  end
+	  end,
+    {reply, Reply, State};
+
+handle_call({stopped_nodes},_From, State) ->
+    Reply=case State#state.cluster_spec of
+	      undefined->
+		  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: Not initiated : ",undefined]]),
+		  {error,["Not initiated : ",undefined]};
+	      _ClusterSpec->
+		  case lib_parent:stopped_nodes() of
+		      {error,Reason}->
+			  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: active nodes : ",Reason]]),
+			  {error,Reason};
+		      {ok,Nodes}->
 			  {ok,Nodes}
 		  end
 	  end,

@@ -71,6 +71,10 @@ create(HostSpec,NodeName,Cookie,PaArgs,EnvArgs,TimeOut)->
 create(HostName,NodeName,Cookie,PaArgs,EnvArgs,
        {Ip,SshPort,Uid,Pwd},TimeOut)->
    
+ %   io:format("HostName,NodeName,Cookie,PaArgs,EnvArgs,
+%Ip,SshPort,Uid,Pwd,TimeOut ~p~n",[{HostName,NodeName,Cookie,PaArgs,EnvArgs,
+%Ip,SshPort,Uid,Pwd,TimeOut,erlang:get_cookie(),?MODULE,?LINE}]),
+    
     Node=list_to_atom(NodeName++"@"++HostName),
     rpc:call(Node,init,stop,[],5000),
     true=check_stopped_node(100,Node,false),
