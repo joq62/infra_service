@@ -52,11 +52,11 @@ desired_nodes()->
 %% @end
 %%--------------------------------------------------------------------
 active_nodes()->
-    AllParentNodes=db_parent_desired_state:get_all_id(),
-    [Parent1|_]=AllParentNodes,
-    {ok,ClusterSpec}=db_parent_desired_state:read(cluster_spec,Parent1),
+    AllNodes=db_parent_desired_state:get_all_id(),
+    [Node1|_]=AllNodes,
+    {ok,ClusterSpec}=db_parent_desired_state:read(cluster_spec,Node1),
     {ok,RootDir}=db_cluster_spec:read(root_dir,ClusterSpec),
-    RunningNodes=[Node||Node<-AllParentNodes,
+    RunningNodes=[Node||Node<-AllNodes,
 			pong==net_adm:ping(Node)],
     ActiveNodes=[Node||Node<-RunningNodes,
 		       rpc:call(Node,filelib,is_dir,[RootDir],5000)],
@@ -69,9 +69,9 @@ active_nodes()->
 %% @end
 %%--------------------------------------------------------------------
 stopped_nodes()->
-    AllParentNodes=db_parent_desired_state:get_all_id(),
+    AllNodes=db_parent_desired_state:get_all_id(),
     {ok,ActiveNodes}=active_nodes(),
-    StoppedNodes=[Node||Node<-AllParentNodes,
+    StoppedNodes=[Node||Node<-AllNodes,
 			false==lists:member(Node,ActiveNodes)],
     {ok,StoppedNodes}.
     

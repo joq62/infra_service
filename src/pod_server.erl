@@ -20,25 +20,18 @@
 
 %% External exports
 -export([
-
-	 create_pod/3,
 	 create_pod/5,
-	 get_pod/2,
-	 get_pod/3,
-	 
-	 create_controller_pods/1, 
-	 create_worker_pods/1,
-	 present_controller_nodes/0,
-	 present_worker_nodes/0,
+	 load_desired_state/1,
+	 desired_nodes/0,
+	 active_nodes/0,
+	 stopped_nodes/0,
 	 
 	 ping/0
 	]).
 
 
 -export([
-	 start_monitoring/1,
-	 wanted_state/1,
-	 heartbeat/0
+
 	]).
 -export([
 	 start/0,
@@ -71,13 +64,28 @@
 start()-> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 stop()-> gen_server:call(?MODULE, {stop},infinity).
 
-create_pod(ParentNode,NodeName,Dir,PaArgs,EnvArgs)->
-    gen_server:call(?MODULE, {create_pod,ParentNode,NodeName,Dir,PaArgs,EnvArgs},infinity).
-create_pod(ClusterSpec,HostSpec,Type)->
-    gen_server:call(?MODULE, {create_pod,ClusterSpec,HostSpec,Type},infinity).
+
+%create_pod(ClusterSpec,HostSpec,Type)->
+ %   gen_server:call(?MODULE, {create_pod,ClusterSpec,HostSpec,Type},infinity).
 
 %get_pod(HostSpec,Type)->
  %     gen_server:call(?MODULE, {get_pod,HostSpec,Type},infinity).
+%-----------------------------------------------------------------------
+load_desired_state(ClusterSpec)->
+    gen_server:call(?MODULE,{load_desired_state,ClusterSpec},infinity).
+
+create_pod(ParentNode,NodeName,PodDir,PaArgs,EnvArgs)->
+    gen_server:call(?MODULE, {create_pod,ParentNode,NodeName,PodDir,PaArgs,EnvArgs},infinity).
+
+desired_nodes()->
+    gen_server:call(?MODULE,{desired_nodes},infinity).
+active_nodes()->
+    gen_server:call(?MODULE,{active_nodes},infinity).
+stopped_nodes()->
+    gen_server:call(?MODULE,{stopped_nodes},infinity).
+
+%%----------------------------------------------------------------------
+
 
 get_pod(ApplSpec,HostSpec)->
       gen_server:call(?MODULE, {get_pod,ApplSpec,HostSpec},infinity).
@@ -136,40 +144,110 @@ init([]) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+
+handle_call({load_desired_state,ClusterSpec},_From, State) ->
+    Reply=case State#state.cluster_spec of
+	      undefined->
+		  ok=db_pod_desired_state:create_table(),
+		  case lib_pod:load_desired_state(ClusterSpec) of
+		      ok->
+			  rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK: initiation of desired state : ",ClusterSpec]]),
+			  NewState=State#state{cluster_spec=ClusterSpec},
+			  ok;
+		      {error,ErrorList}->
+			  NewState=State,
+			  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR:  when intite desired state : ",ErrorList]]),
+			  {error,ErrorList}
+		  end;
+	      ClusterSpec->
+		  NewState=State,
+		  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: Already initiated : ",ClusterSpec]]),
+		  {error,["Already initiated : ",ClusterSpec]};
+	      AnotherCluster->
+		  NewState=State,
+		  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: Already initiated : ",AnotherCluster]]),
+		  {error,["Already initiated : ",AnotherCluster]}
+	  end,
+    {reply, Reply, NewState};
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+
+handle_call({desired_nodes},_From, State) ->
+    Reply=case State#state.cluster_spec of
+	      undefined->
+		  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: Not initiated : ",undefined]]),
+		  {error,["Not initiated : ",undefined]};
+	      _ClusterSpec->
+		  case lib_pod:desired_nodes() of
+		      {error,Reason}->
+			  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: desired nodes : ",Reason]]),
+			  {error,Reason};
+		      {ok,Nodes}->
+			  {ok,Nodes}
+		  end
+	  end,
+    {reply, Reply, State};
+
+handle_call({active_nodes},_From, State) ->
+    Reply=case State#state.cluster_spec of
+	      undefined->
+		  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: Not initiated : ",undefined]]),
+		  {error,["Not initiated : ",undefined]};
+	      _ClusterSpec->
+		  case lib_pod:active_nodes() of
+		      {error,Reason}->
+			  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: active nodes : ",Reason]]),
+			  {error,Reason};
+		      {ok,Nodes}->
+			  {ok,Nodes}
+		  end
+	  end,
+    {reply, Reply, State};
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+
+handle_call({stopped_nodes},_From, State) ->
+    Reply=case State#state.cluster_spec of
+	      undefined->
+		  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: Not initiated : ",undefined]]),
+		  {error,["Not initiated : ",undefined]};
+	      _ClusterSpec->
+		  case lib_pod:stopped_nodes() of
+		      {error,Reason}->
+			  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: active nodes : ",Reason]]),
+			  {error,Reason};
+		      {ok,Nodes}->
+			  {ok,Nodes}
+		  end
+	  end,
+    {reply, Reply, State};
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+
 handle_call({create_pod,ParentNode,NodeName,Dir,PaArgs,EnvArgs},_From, State) ->
-    Reply=create_pod_node(ParentNode,NodeName,Dir,PaArgs,EnvArgs),
+    Reply=lib_pod:create_node(ParentNode,NodeName,Dir,PaArgs,EnvArgs),
     {reply, Reply, State};
     
-handle_call({create_pod,ClusterSpec,_HostSpec,_Type},_From, State) ->
-    controller_pods(ClusterSpec),
-    PresentControllerNodes=present_controller_nodes(ClusterSpec),
-    MissingControllerNodes=missing_controller_nodes(ClusterSpec),
-    NewState=State#state{present_controller_nodes=PresentControllerNodes,
-			 missing_controller_nodes=MissingControllerNodes		    
-			},
-    Reply={PresentControllerNodes,MissingControllerNodes},
-    {reply, Reply, NewState};
-
-
-handle_call({create_controller_pods,ClusterSpec},_From, State) ->
-    controller_pods(ClusterSpec),
-    PresentControllerNodes=present_controller_nodes(ClusterSpec),
-    MissingControllerNodes=missing_controller_nodes(ClusterSpec),
-    NewState=State#state{present_controller_nodes=PresentControllerNodes,
-			 missing_controller_nodes=MissingControllerNodes		    
-			},
-    Reply={PresentControllerNodes,MissingControllerNodes},
-    {reply, Reply, NewState};
-
-handle_call({create_worker_pods,ClusterSpec},_From, State) ->
-    worker_pods(ClusterSpec,ClusterSpec) ,
-    PresentWorkerNodes=present_worker_nodes(ClusterSpec),
-    MissingWorkerNodes=missing_worker_nodes(ClusterSpec),
-    NewState=State#state{present_worker_nodes=PresentWorkerNodes,
-			 missing_worker_nodes=MissingWorkerNodes		    
-			},
-    Reply={PresentWorkerNodes,MissingWorkerNodes},
-    {reply, Reply, NewState};
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
 
 handle_call({get_pod,ApplSpec,HostSpec},_From, State) ->
     % Candidates
@@ -198,12 +276,6 @@ handle_call({get_pod,ApplSpec,HostSpec},_From, State) ->
     {reply, Reply, State};
 
 
-handle_call({present_controllers},_From, State) ->
-    Reply=State#state.present_controller_nodes,
-    {reply, Reply, State};
-handle_call({present_workers},_From, State) ->
-    Reply=State#state.present_worker_nodes,
-    {reply, Reply, State};
 
 handle_call({ping},_From, State) ->
     Reply=pong,
@@ -220,77 +292,6 @@ handle_call(Request, From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
-handle_cast({start_monitoring,ClusterSpec}, State) ->
- %   io:format("start_monitoring,ClusterSpec ~p~n",[{ClusterSpec,?MODULE,?FUNCTION_NAME}]),
-    PresentControllerNodes=present_controller_nodes(ClusterSpec),
-    MissingControllerNodes=missing_controller_nodes(ClusterSpec),
-  %  io:format("PresentControllerNodes,MissingControllerNodes ~p~n",[{PresentControllerNodes,
-								     MissingControllerNodes,
-	%							     ?MODULE,?FUNCTION_NAME}]),
-    PresentWorkerNodes=present_worker_nodes(ClusterSpec),
-    MissingWorkerNodes=missing_worker_nodes(ClusterSpec),
-  
-    
-    NewState=State#state{cluster_spec=ClusterSpec,
-			 present_controller_nodes=PresentControllerNodes,
-			 missing_controller_nodes=MissingControllerNodes,
-			 present_worker_nodes=PresentWorkerNodes,
-			 missing_worker_nodes=MissingWorkerNodes
-			},
-
-    spawn(fun()->hbeat(ClusterSpec) end),
-    {noreply, NewState};
-
-handle_cast({heartbeat}, State) ->
-
-    NewPresentControllerNodes=present_controller_nodes(State#state.cluster_spec),
-    StartedControllers=[Node||Node<-NewPresentControllerNodes,
-			      false==lists:member(Node,State#state.present_controller_nodes)],
-    case StartedControllers of
-	[]->
-	    no_change;
-	StartedControllers ->
-	    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Started Controller nodes : ",StartedControllers]])
-    end,
-    
-    NewMissingControllerNodes=missing_controller_nodes(State#state.cluster_spec),
-    StoppedControllers=[Node||Node<-NewMissingControllerNodes,
-			      false==lists:member(Node,State#state.missing_controller_nodes)],
-    case StoppedControllers of
-	[]->
-	    no_change;
-	StoppedControllers ->
-	    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Stopped Controller nodes : ",StoppedControllers]])
-    end,
-
-    NewPresentWorkerNodes=present_worker_nodes(State#state.cluster_spec),
-    StartedWorkers=[Node||Node<-NewPresentWorkerNodes,
-			  false==lists:member(Node,State#state.present_worker_nodes)],
-    case StartedWorkers of
-	[]->
-	    no_change;
-	StartedWorkers ->
-	    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Started Worker nodes : ",StartedWorkers]])
-    end,
-    
-    NewMissingWorkerNodes=missing_worker_nodes(State#state.cluster_spec),
-    StoppedWorkers=[Node||Node<-NewMissingControllerNodes,
-			  false==lists:member(Node,State#state.missing_controller_nodes)],
-    case StoppedWorkers of
-	[]->
-	    no_change;
-	StoppedWorkers ->
-	    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Stopped worker nodes : ",StoppedWorkers]])
-    end,
-
-
-    NewState=State#state{present_controller_nodes=NewPresentControllerNodes,
-			 missing_controller_nodes=NewMissingControllerNodes,
-			 present_worker_nodes=NewPresentWorkerNodes,
-			 missing_worker_nodes=NewMissingWorkerNodes},
-  
-    spawn(fun()->hbeat(State#state.cluster_spec) end),
-    {noreply, NewState};
 
 handle_cast(Msg, State) ->
     io:format("unmatched match cast ~p~n",[{Msg,?MODULE,?LINE}]),
@@ -336,237 +337,17 @@ code_change(_OldVsn, State, _Extra) ->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-hbeat(ClusterSpec)->
-    timer:sleep(?HeartbeatTime),
-    rpc:call(node(),?MODULE,wanted_state,[ClusterSpec],30*1000), 
-    rpc:cast(node(),?MODULE,heartbeat,[]).
 
 %% --------------------------------------------------------------------
 %% Function: terminate/2
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
--define(TimeOut,10*1000).
 
 %% --------------------------------------------------------------------
 %% Function: terminate/2
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-wanted_state(ClusterSpec)->
-    Controllers=[{Node,db_cluster_instance:read(pod_dir,ClusterSpec,Node)}||Node<-present_controller_nodes(ClusterSpec)],
-    ControllerNoDirs=[Node||{Node,{ok,PodDir}}<-Controllers,
-			    true/=rpc:call(Node,filelib,is_dir,[PodDir],2000)],
-    [rpc:call(Node,init,stop,[],2000)||Node<-ControllerNoDirs],
-    MissingControllerNodes=lists:append(ControllerNoDirs,missing_controller_nodes(ClusterSpec)),  
-    
-    Workers=[{Node,db_cluster_instance:read(pod_dir,ClusterSpec,Node)}||Node<-present_worker_nodes(ClusterSpec)],
-    WorkerNoDirs=[Node||{Node,{ok,PodDir}}<-Workers,
-			    true/=rpc:call(Node,filelib,is_dir,[PodDir],2000)],
-    [rpc:call(Node,init,stop,[],2000)||Node<-WorkerNoDirs],
-    MissingWorkerNodes=lists:append(WorkerNoDirs,missing_worker_nodes(ClusterSpec)),
-
-    [restart_pod(ClusterSpec,PodNode)||PodNode<-MissingControllerNodes],
-    [restart_pod(ClusterSpec,PodNode)||PodNode<-MissingWorkerNodes],
-    ok.
-%% --------------------------------------------------------------------
-%% Function: terminate/2
-%% Description: Shutdown the server
-%% Returns: any (ignored by gen_server)
-%% --------------------------------------------------------------------
-missing_controller_nodes(ClusterSpec)->
-   
-    [Node||Node<-db_cluster_instance:nodes(controller,ClusterSpec), 
-	   pang=:=net_adm:ping(Node)].
-present_controller_nodes(ClusterSpec)->
-    [Node||Node<-db_cluster_instance:nodes(controller,ClusterSpec), 
-	   pong=:=net_adm:ping(Node)].
-
-%% --------------------------------------------------------------------
-%% Function: terminate/2
-%% Description: Shutdown the server
-%% Returns: any (ignored by gen_server)
-%% --------------------------------------------------------------------
-missing_worker_nodes(ClusterSpec)->
-    [Node||Node<-db_cluster_instance:nodes(worker,ClusterSpec), 
-	   pang=:=net_adm:ping(Node)].
-present_worker_nodes(ClusterSpec)->
-    [Node||Node<-db_cluster_instance:nodes(worker,ClusterSpec), 
-	   pong=:=net_adm:ping(Node)].
-%% --------------------------------------------------------------------
-%% Function: terminate/2
-%% Description: Shutdown the server
-%% Returns: any (ignored by gen_server)
-%% --------------------------------------------------------------------
-%% --------------------------------------------------------------------
-%% Function: terminate/2
-%% Description: Shutdown the server
-%% Returns: any (ignored by gen_server)
-%% --------------------------------------------------------------------
-restart_pod(ClusterSpec,PodNode)->
-    {ok,HostSpec}=db_cluster_instance:read(host_spec,ClusterSpec,PodNode),
-    {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
-    ConnectNodes=db_cluster_instance:nodes(connect,ClusterSpec),
-    
-    {ok,HostName}=db_host_spec:read(hostname,HostSpec),
-    {ok,PodName}=db_cluster_instance:read(pod_name,ClusterSpec,PodNode),
-    rpc:call(PodNode,init,stop,[]),
-    {ok,PodDir}=db_cluster_instance:read(pod_dir,ClusterSpec,PodNode),
-    PaArgs=" -detached ",
-    EnvArgs=" ",
-    create_pod_node(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,?TimeOut).
 
 
-%% --------------------------------------------------------------------
-%% Function: terminate/2
-%% Description: Shutdown the server
-%% Returns: any (ignored by gen_server)
-%% --------------------------------------------------------------------
-controller_pods(ClusterSpec)->
-    {ok,NumControllers}=db_cluster_spec:read(num_controllers,ClusterSpec),
-    {ok,ControllerHostSpecs}=db_cluster_spec:read(controller_host_specs,ClusterSpec),
-    create_controller_pod(ClusterSpec,NumControllers,ControllerHostSpecs,[]).
-    
-create_controller_pod(_ClusterSpec,0,_ControllerHostSpecs,Acc)->
-    Acc;
-create_controller_pod(ClusterSpec,N,[HostSpec|T],Acc) ->
-    ConnectNodes=db_cluster_instance:nodes(connect,ClusterSpec),
-    {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
-    {ok,ClusterDir}=db_cluster_spec:read(dir,ClusterSpec),
-    {ok,HostName}=db_host_spec:read(hostname,HostSpec),
-    
-    PodName=integer_to_list(N)++"_"++ClusterSpec++"_controller",
-    PodNode=list_to_atom(PodName++"@"++HostName),
-    rpc:call(PodNode,init,stop,[]),
-    PodDirName=PodName++".dir",
-    PodDir=filename:join(ClusterDir,PodDirName),
-    Type=controller,
-    Status=candidate,
-    db_cluster_instance:create(ClusterSpec,Type,PodName,PodNode,PodDir,HostSpec,Status),
-    PaArgs=" -detached ",
-    EnvArgs=" ",
-    Result=case create_pod_node(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,?TimeOut) of
-	       {error,Reason}->
-		   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Failed to create ",PodNode ,Reason]]),
-		   {error,Reason};
-	       {ok,PodNode,NodeDir,PingResult}->
-		   rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Controller created ",PodNode]]),
-		   {ok,PodNode,NodeDir,PingResult} 
-	   end,
-    RotatedHostSpecList=lists:append(T,[HostSpec]),
-    create_controller_pod(ClusterSpec,N-1,RotatedHostSpecList,[Result|Acc]).
-    
-%% --------------------------------------------------------------------
-%% Function: terminate/2
-%% Description: Shutdown the server
-%% Returns: any (ignored by gen_server)
-%% --------------------------------------------------------------------
-worker_pods(ClusterSpec,ClusterSpec)->
-    {ok,NumWorkers}=db_cluster_spec:read(num_workers,ClusterSpec),
-    {ok,WorkerHostSpecs}=db_cluster_spec:read(worker_host_specs,ClusterSpec),
-    create_worker_pod(ClusterSpec,NumWorkers,WorkerHostSpecs,[]).
-
-create_worker_pod(_ClusterSpec,0,_WorkerHostSpecs,Acc)->
-    Acc;
-create_worker_pod(ClusterSpec,N,[HostSpec|T],Acc) ->
-    ConnectNodes=db_cluster_instance:nodes(connect,ClusterSpec),
-    {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
-    {ok,ClusterDir}=db_cluster_spec:read(dir,ClusterSpec),
-    {ok,HostName}=db_host_spec:read(hostname,HostSpec),
-    PodName=integer_to_list(N)++"_"++ClusterSpec++"_worker",
-    PodNode=list_to_atom(PodName++"@"++HostName),
-    rpc:call(PodNode,init,stop,[]),
-    PodDirName=PodName++".dir",
-    PodDir=filename:join(ClusterDir,PodDirName),
-    Type=worker,
-    Status=candidate,
-    db_cluster_instance:create(ClusterSpec,Type,PodName,PodNode,PodDir,HostSpec,Status),
-    PaArgs=" -detached ",
-    EnvArgs=" ",
-    Result=case create_pod_node(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,?TimeOut) of
-	       {error,Reason}->
-		   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Failed to create ",PodNode ,Reason]]),
-		   {error,Reason};
-	       {ok,PodNode,NodeDir,PingResult}->
-		   rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Worker created ",PodNode]]),
-		   {ok,PodNode,NodeDir,PingResult} 
-	   end,
-    RotatedHostSpecList=lists:append(T,[HostSpec]),
-    create_worker_pod(ClusterSpec,N-1,RotatedHostSpecList,[Result|Acc]).
-    
-%% --------------------------------------------------------------------
-%% Function: terminate/2
-%% Description: Shutdown the server
-%% Returns: any (ignored by gen_server)
-%% --------------------------------------------------------------------
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-create_pod_node(ParentNode,NodeName,Dir,PaArgs,EnvArgs)->
-    {ok,HostName}=rpc:call(ParentNode,net,gethostname,[],5000),
-    Cookie=atom_to_list(rpc:call(ParentNode,erlang,get_cookie,[],5000)),
-    Args=PaArgs++" "++"-setcookie "++Cookie++" "++EnvArgs,
-    Result=case rpc:call(ParentNode,slave,start,[HostName,NodeName,Args],5000) of
-	       {badrpc,Reason}->
-		   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
-		   {badrpc,Reason};
-	       {error,Reason}->
-		   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
-		   {error,Reason};
-	       {ok,SlaveNode}->
-		   true=rpc:call(SlaveNode,code,add_patha,[Dir],5000),
-		   case net_kernel:connect_node(SlaveNode) of
-		       false->
-			   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error failed_connect ",SlaveNode]]),
-			   {error,[failed_connect,SlaveNode]};
-		       ignored->
-			   {error,[ignored,SlaveNode]};
-		       true->
-			   case rpc:call(SlaveNode,file,make_dir,[Dir],5000) of
-			       {badrpc,Reason}->
-				   rpc:call(SlaveNode,init,stop,[],1000),
-				   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
-				   {badrpc,Reason};
-			       {error,Reason}->
-				   rpc:call(SlaveNode,init,stop,[],1000),
-				   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
-				   {error,Reason};
-			       ok->  
-				   rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Pod node suvćcesfully created with Dir  ",SlaveNode,Dir]]),
-				   {ok,SlaveNode,Dir}
-			   end
-		   end
-	   end,
-    Result.
-
-    
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-
-create_pod_node(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,TimeOut)->
-    Result=case ops_vm:ssh_create(HostName,PodName,PodDir,Cookie,PaArgs,EnvArgs,ConnectNodes,TimeOut) of
-	       {error,Reason}->
-		   {error,[Reason,?MODULE,?LINE]};
-	       {ok,PodNode,NodeDir,PingResult}->
-		   case net_adm:ping(PodNode) of
-		       pang->
-			   {error,["couldnt connect to PodNode :",PodNode, ?MODULE,?LINE]};
-		       pong->
-			   case rpc:call(PodNode,filelib,is_dir,[NodeDir],5000) of
-			       {badrpc,Reason}->
-				   rpc:call(PodNode,init,stop,[],1000),
-				   {error,[badrpc,Reason,?MODULE,?LINE]};
-			       false->
-				   rpc:call(PodNode,init,stop,[],1000),
-				   {error,["Dir not exists :",NodeDir, ?MODULE,?LINE]};
-			       true->
-				   {ok,PodNode,NodeDir,PingResult}
-			   end
-		   end
-	   end,
-    Result.

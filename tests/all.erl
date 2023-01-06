@@ -28,7 +28,8 @@ start([ClusterSpec,HostSpec])->
     ok=setup(ClusterSpec),
  %   ok=console_test:start(ClusterSpec,HostSpec),
 
-    ok=parent_test:start(ClusterSpec,HostSpec),
+  %  ok=parent_test:start(ClusterSpec,HostSpec),
+    ok=pod_test:start(ClusterSpec,HostSpec),
        
     io:format("Stop OK !!! ~p~n",[{?MODULE,?FUNCTION_NAME}]),
  %   timer:sleep(2000),
