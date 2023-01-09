@@ -86,31 +86,10 @@ stopped_nodes()->
 
 %%----------------------------------------------------------------------
 
-
-get_pod(ApplSpec,HostSpec)->
-      gen_server:call(?MODULE, {get_pod,ApplSpec,HostSpec},infinity).
-get_pod(ApplSpec,HostSpec,Type)->
-      gen_server:call(?MODULE, {get_pod,ApplSpec,HostSpec,Type},infinity).
-
-create_controller_pods(ClusterSpec)->
-    gen_server:call(?MODULE, {create_controller_pods,ClusterSpec},infinity).
-
-create_worker_pods(ClusterSpec)->
-    gen_server:call(?MODULE, {create_worker_pods,ClusterSpec},infinity).
-
-present_controller_nodes()->
-    gen_server:call(?MODULE, {present_controllers},infinity).
-present_worker_nodes()->
-    gen_server:call(?MODULE, {present_workers},infinity).
-
 ping() ->
     gen_server:call(?MODULE, {ping}).
 %% cast
-start_monitoring(ClusterSpec)->
-    gen_server:cast(?MODULE, {start_monitoring,ClusterSpec}).
 
-heartbeat()-> 
-    gen_server:cast(?MODULE, {heartbeat}).
 
 %% ====================================================================
 %% Server functions

@@ -29,7 +29,8 @@ start(ClusterSpec,_StartHostSpec)->
     ok=load_desired_state_test(ClusterSpec),
     ok=create_parents_test(ClusterSpec),
     ok=create_check_nodes_test(ClusterSpec),
-  %  ok=create_connect(ClusterSpec,StartHostSpec),
+
+  
 %    ok=init_test(ClusterSpec,StartHostSpec),
         
   
@@ -37,6 +38,13 @@ start(ClusterSpec,_StartHostSpec)->
   %  init:stop(),
   %  timer:sleep(2000),
     ok.
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -75,7 +83,7 @@ create_check_nodes_test(ClusterSpec)->
 
 
 create_pod(PodNode)->
-    {PodNode,NodeName,PodDir,ParentNode,PaArgList,EnvArgs}=db_pod_desired_state:read(PodNode),
+    {PodNode,NodeName,PodDir,ParentNode,PaArgList,_ApplSpecList,_HostSpec,EnvArgs}=db_pod_desired_state:read(PodNode),
     pod_server:create_pod(ParentNode,NodeName,PodDir,PaArgList,EnvArgs).
 
 %%--------------------------------------------------------------------

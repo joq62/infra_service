@@ -20,6 +20,18 @@
 -define(TimeOut,10*1000).
 
 %% External exports
+
+
+-export([
+	 create_appl/2,
+	 load_desired_state/1,
+	 desired_appls/0,
+	 active_appls/0,
+	 stopped_appls/0,
+	 
+	 ping/0
+	]).
+
 -export([
 	 deploy_appls/1,
 	 new/4,
@@ -33,8 +45,7 @@
 	 start_monitoring/1,
 	 heartbeat/0,
 	 wanted_state/1,
-	 restart_appl/2,
-	 ping/0
+	 restart_appl/2
 	]).
 
 
@@ -67,6 +78,21 @@
 start()-> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 stop()-> gen_server:call(?MODULE, {stop},infinity).
 
+%---------------------------------------------------------------------
+load_desired_state(ClusterSpec)->
+    gen_server:call(?MODULE,{load_desired_state,ClusterSpec},infinity).
+
+create_appl(ApplSpec,PodNode)->
+     gen_server:call(?MODULE, {create_appl,ApplSpec,PodNode},infinity).
+
+desired_appls()->
+    gen_server:call(?MODULE,{desired_appls},infinity).
+active_appls()->
+    gen_server:call(?MODULE,{active_appls},infinity).
+stopped_appls()->
+    gen_server:call(?MODULE,{stopped_appls},infinity).
+
+%---------------------------------------------------------------------
 new(ApplSpec,HostSpec,ClusterSpec,TimeOut)->
     gen_server:call(?MODULE, {new,ApplSpec,HostSpec,ClusterSpec,TimeOut},infinity).
 new_on_pod(ApplSpec,PodNode,ClusterSpec,TimeOut)->
@@ -132,39 +158,113 @@ init([]) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
-handle_call({new_on_pod,ApplSpec,PodNode,ClusterSpec,TimeOut},_From, State) ->
-    Reply=do_new_on_pod(ApplSpec,PodNode,ClusterSpec,TimeOut),
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+handle_call({load_desired_state,ClusterSpec},_From, State) ->
+    Reply=case State#state.cluster_spec of
+	      undefined->
+		  ok=db_pod_desired_state:create_table(),
+		  case lib_appl:load_desired_state(ClusterSpec) of
+		      ok->
+			  rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK: initiation of desired state : ",ClusterSpec]]),
+			  NewState=State#state{cluster_spec=ClusterSpec},
+			  ok;
+		      {error,ErrorList}->
+			  NewState=State,
+			  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR:  when intite desired state : ",ErrorList]]),
+			  {error,ErrorList}
+		  end;
+	      ClusterSpec->
+		  NewState=State,
+		  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: Already initiated : ",ClusterSpec]]),
+		  {error,["Already initiated : ",ClusterSpec]};
+	      AnotherCluster->
+		  NewState=State,
+		  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: Already initiated : ",AnotherCluster]]),
+		  {error,["Already initiated : ",AnotherCluster]}
+	  end,
+    {reply, Reply, NewState};
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+
+handle_call({desired_nodes},_From, State) ->
+    Reply=case State#state.cluster_spec of
+	      undefined->
+		  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: Not initiated : ",undefined]]),
+		  {error,["Not initiated : ",undefined]};
+	      _ClusterSpec->
+		  case lib_appl:desired_appls() of
+		      {error,Reason}->
+			  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: desired nodes : ",Reason]]),
+			  {error,Reason};
+		      {ok,Nodes}->
+			  {ok,Nodes}
+		  end
+	  end,
     {reply, Reply, State};
 
-handle_call({load_start,ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut},_From, State) ->
-    Reply=do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut),
+handle_call({active_nodes},_From, State) ->
+    Reply=case State#state.cluster_spec of
+	      undefined->
+		  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: Not initiated : ",undefined]]),
+		  {error,["Not initiated : ",undefined]};
+	      _ClusterSpec->
+		  case lib_appl:active_appls() of
+		      {error,Reason}->
+			  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: active nodes : ",Reason]]),
+			  {error,Reason};
+		      {ok,Nodes}->
+			  {ok,Nodes}
+		  end
+	  end,
     {reply, Reply, State};
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
 
-
-handle_call({new,ApplSpec,HostSpec,ClusterSpec,TimeOut},_From, State) ->
-    Reply=appl_new(ApplSpec,HostSpec,ClusterSpec,TimeOut),
+handle_call({stopped_nodes},_From, State) ->
+    Reply=case State#state.cluster_spec of
+	      undefined->
+		  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: Not initiated : ",undefined]]),
+		  {error,["Not initiated : ",undefined]};
+	      _ClusterSpec->
+		  case lib_appl:stopped_appls() of
+		      {error,Reason}->
+			  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: active nodes : ",Reason]]),
+			  {error,Reason};
+		      {ok,Nodes}->
+			  {ok,Nodes}
+		  end
+	  end,
     {reply, Reply, State};
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
 
-handle_call({delete,ApplSpec,PodNode,ClusterSpec},_From, State) ->
-    Reply=appl_del(ApplSpec,PodNode,ClusterSpec),
+handle_call({create_pod,ParentNode,NodeName,Dir,PaArgs,EnvArgs},_From, State) ->
+    Reply=lib_pod:create_node(ParentNode,NodeName,Dir,PaArgs,EnvArgs),
     {reply, Reply, State};
+    
 
-handle_call({deploy_appls,ClusterSpec},_From, State) ->
-    Reply=deploy(ClusterSpec),
-      {reply, Reply, State};
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
 
-handle_call({present_apps,ClusterSpec},_From, State) ->
-    Reply=present(ClusterSpec),
-    {reply, Reply, State};
-
-handle_call({missing_apps,ClusterSpec},_From, State) ->
-    Reply=missing(ClusterSpec),
-    {reply, Reply, State};
-
-handle_call({initiate,ClusterSpec},_From, State) ->
-
-    Reply=ok,
-    {reply, Reply, State#state{cluster_spec=ClusterSpec}};
 
 handle_call({ping},_From, State) ->
     Reply=pong,
@@ -181,42 +281,6 @@ handle_call(Request, From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
-handle_cast({start_monitoring,ClusterSpec}, State) ->
-    Present=present(ClusterSpec),
-    Missing=missing(ClusterSpec),
-    NewState=State#state{cluster_spec=ClusterSpec,
-			 present=Present,
-			 missing=Missing		
-			},
-    spawn(fun()->hbeat(ClusterSpec) end),
-    {noreply, NewState};
-
-handle_cast({heartbeat}, State) ->
-    NewPresent=present(State#state.cluster_spec),
-    Started=[{AppSpec,PodNode,App}||{AppSpec,PodNode,App}<-NewPresent,
-		   false==lists:member({AppSpec,PodNode,App},State#state.present)],
-    case Started of
-	[]->
-	    no_change;
-		Started ->
-	    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Started applications : ",Started]])
-    end,
-    
-    NewMissing=missing(State#state.cluster_spec),
-    Stopped=[{AppSpec,PodNode,App}||{AppSpec,PodNode,App}<-NewMissing,
-		   false==lists:member({AppSpec,PodNode,App},State#state.missing)],
-    case Stopped of
-	[]->
-	    no_change;
-	Stopped ->
-	    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Stopped applications : ",Stopped]])
-    end,
-    NewState=State#state{present=NewPresent,
-			 missing=NewMissing},
-    spawn(fun()->hbeat(State#state.cluster_spec) end),
-    {noreply, NewState};
-
-
 handle_cast(Msg, State) ->
     io:format("unmatched match cast ~p~n",[{Msg,?MODULE,?LINE}]),
     {noreply, State}.
@@ -365,8 +429,6 @@ appl_new(ApplSpec,HostSpec,ClusterSpec,TimeOut)->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-
-
 
 do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut)->
     Result= case rpc:call(PodNode,file,make_dir,[ApplDir],5000) of
