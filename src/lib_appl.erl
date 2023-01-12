@@ -73,7 +73,13 @@ stopped_appls()->
 			false==lists:member(Node,ActiveNodes)],
     {ok,StoppedNodes}.
     
-    
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
@@ -163,28 +169,23 @@ do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut)->
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-get_candidate_pods(ApplSpec,HostSpec)->
-    % Candidates
-    {ok,ActivePods}=pod_server:active_nodes(),
-    Candidates=[PodNode||PodNode<-db_pod_desired_state:get_all_id(),
-			 {ok,HostSpec}==db_pod_desired_state:read(host_spec,podNode),
-			 {ok,ApplSpec}/=db_pod_desired_state:read(appl_spec,PodNode),
-			 true==lists:member(PodNode,ActivePods)],
+get_candidate_pods(SpecId,HostSpec,ClusterSpec)->
+    {ok,ApplSpec}=db_appl_deployment:read(appl_spec,SpecId),
+    RightHost=[PodNode||PodNode<-db_pod_desired_state:get_all_id(),
+			{ok,HostSpec}==db_pod_desired_state:read(host_spec,PodNode)],
+    NodeApplSpecList=[{PodNode,db_pod_desired_state:read(appl_spec_list,PodNode)}||PodNode<-RightHost],
+    Candidates=[PodNode||{PodNode,{ok,ApplSpecList}}<-NodeApplSpecList,
+			 false==lists:member(ApplSpec,ApplSpecList),
+			 {ok,ClusterSpec}==db_pod_desired_state:read(cluster_spec,PodNode)],
     prioritize(Candidates,[]).
 
 prioritize([],Acc)->
     [PodNode||{_NumApplSpecs,PodNode}<-lists:keysort(1,Acc)];
 prioritize([PodNode|T],Acc) ->
-    {ok,ApplSpecList}=db_pod_desired_state:read(appl_spec,PodNode),
+    {ok,ApplSpecList}=db_pod_desired_state:read(appl_spec_list,PodNode),
     NumApplSpecs=list_length:start(ApplSpecList),
     prioritize(T,[{NumApplSpecs,PodNode}|Acc]).
-    
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-
+ 
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
@@ -193,8 +194,12 @@ prioritize([PodNode|T],Acc) ->
 load_desired_state(ClusterSpec)->
     {ok,PodsHostList}=db_cluster_spec:read(pods,ClusterSpec),
     HostSpecList=[HostSpec||{_Num,HostSpec}<-PodsHostList],
-    ApplDeploymentSpecInfoList=[db_appl_deployment:read(ApplDeploymentId)||ApplDeploymentId<-db_appl_deployment:get_all_id()],
-    main_load_desired_state(ApplDeploymentSpecInfoList,HostSpecList,[]).
+    ApplDeploymentSpecInfoList=[db_appl_deployment:read(ApplDeploymentId)||ApplDeploymentId<-db_appl_deployment:get_all_id(),
+			       {ok,ClusterSpec}==db_appl_deployment:read(cluster_spec,ApplDeploymentId)],
+ %   io:format("ClusterSpec, ApplDeploymentSpecInfoList ~p~n",[{ClusterSpec,ApplDeploymentSpecInfoList,?MODULE,?FUNCTION_NAME,?LINE}]),
+    Result=main_load_desired_state(ApplDeploymentSpecInfoList,HostSpecList,[]),
+ %   io:format("Result ~p~n",[{Result,?MODULE,?FUNCTION_NAME,?LINE}]).
+    ok.
 
 main_load_desired_state([],_HostSpecList,Acc)->
     Acc;
@@ -206,26 +211,42 @@ main_load_desired_state([ApplDeploymentSpec|T],HostSpecList,Acc) ->
 load_desired_state({_SpecId,_ApplSpec,_Vsn,_ClusterSpec,0,any_host},_HostList,Acc)->
     Acc;
 load_desired_state({SpecId,ApplSpec,_Vsn,ClusterSpec,N,any_host},[HostSpec|T],Acc)->
-    PodNode=get_candidate_pods(ApplSpec,HostSpec),    
-    Result=case db_pod_desired_state:add_appl_list(ApplSpec,PodNode) of
-	       {aborted,Reason}->
-		   Reason;
-	       {atomic,ok}->
-		   ok
+  %  io:format("ApplSpec,WantedHostSpec ~p~n",[{ApplSpec,HostSpec,?MODULE,?FUNCTION_NAME}]),
+    Result=case get_candidate_pods(SpecId,HostSpec,ClusterSpec) of
+	       []->
+		   {error,["ERROR: No candidates  ",ApplSpec,HostSpec]};
+	       [PodNode|_]->
+		   case db_pod_desired_state:add_appl_list(ApplSpec,PodNode) of
+		       {aborted,Reason}->
+			   {error,["ERROR: Aborted ApplSpec,PodNode,HostSpec : ",Reason,ApplSpec,PodNode,HostSpec]};
+		       {atomic,ok}->
+			%   io:format("Ok  ~p~n",[{ApplSpec,PodNode,?MODULE,?FUNCTION_NAME}]),
+			   ok
+		   end
 	   end,
     RotatedHostList=lists:append(T,[HostSpec]),
     load_desired_state({SpecId,ApplSpec,_Vsn,ClusterSpec,N-1,any_host},RotatedHostList,[Result|Acc]);
 		       
 load_desired_state({_SpecId,_ApplSpec,_Vsn,_ClusterSpec,0,_Affinity},_HostList,Acc)->
     Acc;
-load_desired_state({SpecId,ApplSpec,_Vsn,ClusterSpec,N,[WantedHostSpec|T]},HostList,Acc)->
-    Result=case lists:member(WantedHostSpec,HostList) of
+load_desired_state({SpecId,ApplSpec,_Vsn,ClusterSpec,N,[HostSpec|T]},HostList,Acc)->
+  %  io:format("ApplSpec,WantedHostSpec ~p~n",[{ApplSpec,WantedHostSpec,?MODULE,?FUNCTION_NAME}]),
+    Result=case lists:member(HostSpec,HostList) of
 	       false->
-		   {error,["ERROR: WantedHost not part of cluster hosts : ",WantedHostSpec,HostList]};
+		   {error,["ERROR: Host not part of cluster hosts : ",HostSpec,HostList]};
 	       true->
-		   PodNode=get_candidate_pods(ApplSpec,WantedHostSpec),    
-		   {atomic,ok}=db_pod_desired_state:add_appl_list(ApplSpec,PodNode),
-		   ok
+		   case get_candidate_pods(SpecId,HostSpec,ClusterSpec) of
+		       []->
+			   {error,["ERROR: No candidates  ",ApplSpec,HostSpec]};
+		       [PodNode|_]->				   
+			   case db_pod_desired_state:add_appl_list(ApplSpec,PodNode) of
+			       {aborted,Reason}->
+				   {error,["ERROR: Aborted ApplSpec,PodNode,HostSpec : ",Reason,ApplSpec,PodNode,HostSpec]};
+			       {atomic,ok}->
+			%	   io:format("Ok  ~p~n",[{ApplSpec,PodNode,?MODULE,?FUNCTION_NAME}]),
+				   ok
+			   end
+		   end
 	   end,
-    RotatedWantedHostList=lists:append(T,[WantedHostSpec]),
+    RotatedWantedHostList=lists:append(T,[HostSpec]),
     load_desired_state({SpecId,ApplSpec,_Vsn,ClusterSpec,N-1,RotatedWantedHostList},HostList,[Result|Acc]).

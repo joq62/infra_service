@@ -145,12 +145,12 @@ load_desired_state([{NumPods,HostSpec}|T],ClusterSpec,Acc) ->
     {ok,RootDir}=db_cluster_spec:read(root_dir,ClusterSpec),
 %    {ok,HostName}=db_host_spec:read(hostname,HostSpec),
     BaseNodeName=ClusterSpec++"_pod",
-    Result=load_info(NumPods,RootDir,BaseNodeName,HostSpec,ParentNode,[]),
+    Result=load_info(NumPods,RootDir,BaseNodeName,ClusterSpec,HostSpec,ParentNode,[]),
     load_desired_state(T,ClusterSpec,[Result|Acc]).
 
-load_info(0,_RootDir,_BaseNodeName,_HostSpec,_ParentNode,Acc)->
+load_info(0,_RootDir,_BaseNodeName,_ClusterSpec,_HostSpec,_ParentNode,Acc)->
     Acc;
-load_info(N,RootDir,BaseNodeName,HostSpec,ParentNode,Acc)->
+load_info(N,RootDir,BaseNodeName,ClusterSpec,HostSpec,ParentNode,Acc)->
     NodeName=integer_to_list(N)++"_"++BaseNodeName,
     {ok,HostName}=db_host_spec:read(hostname,HostSpec),
     PodNode=list_to_atom(NodeName++"@"++HostName),
@@ -158,10 +158,10 @@ load_info(N,RootDir,BaseNodeName,HostSpec,ParentNode,Acc)->
     PaArgsList=[],
     EnvArgs=" ",             
     AppSpecList=[],
-    Result=case db_pod_desired_state:create(PodNode,NodeName,PodDir,ParentNode,AppSpecList,HostSpec,PaArgsList,EnvArgs) of
+    Result=case db_pod_desired_state:create(PodNode,NodeName,PodDir,ParentNode,AppSpecList,ClusterSpec,HostSpec,PaArgsList,EnvArgs) of
 	       {atomic,ok}->
 		   ok;
 	       Reason->
 		   {error,Reason}
 	   end,
-    load_info(N-1,RootDir,BaseNodeName,HostSpec,ParentNode,[Result|Acc]).
+    load_info(N-1,RootDir,BaseNodeName,ClusterSpec,HostSpec,ParentNode,[Result|Acc]).
