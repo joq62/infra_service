@@ -53,7 +53,7 @@ desired_appls()->
 %% @end
 %%--------------------------------------------------------------------
 active_appls()->
-    AllNodes=db_appl_desired_state:get_all_id(),
+    AllNodes=db_pod_desired_state:get_all_id(),
     RunningNodesDir=[{Node,db_appl_desired_state:read(pod_dir)}||Node<-AllNodes,
 								pong==net_adm:ping(Node)],
     ActiveNodes=[Node||{Node,{ok,PodDir}}<-RunningNodesDir,
@@ -91,11 +91,10 @@ create_appl(ApplSpec,PodNode)->
 
 create_appl(ApplSpec,PodNode,TimeOut)->
     {ok,PodDir}=db_pod_desired_state:read(pod_dir,PodNode),
-    % Delete and create ApplDir
     ApplDir=filename:join(PodDir,ApplSpec),
     rpc:call(PodNode,file,del_dir_r,[ApplDir],5000),
     ok=rpc:call(PodNode,file,make_dir,[ApplDir],5000),
-    %% set application envs
+    
     {ok,HostSpec}=db_pod_desired_state:read(host_spec,PodNode),
     {ok,ApplicationConfig}=db_host_spec:read(application_config,HostSpec),  
     _SetEnvResult=[rpc:call(PodNode,application,set_env,[[Config]],5000)||Config<-ApplicationConfig],
@@ -105,10 +104,9 @@ create_appl(ApplSpec,PodNode,TimeOut)->
 		   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
 		   {error,Reason};
 	       ok->
-		  % {atomic,ok}=db_appl_instance:create(ClusterSpec,ApplSpec,PodNode,HostSpec,{date(),time()}),
 		   {ok,LocalTypeList}=db_appl_spec:read(local_type,ApplSpec),
 		   [rpc:call(PodNode,rd,add_local_resource,[LocalType,PodNode],5000)||LocalType<-LocalTypeList],
-						%   [rd:add_target_resource_type(LocalType)||LocalType<-LocalTypeList],
+		   %   [rd:add_target_resource_type(LocalType)||LocalType<-LocalTypeList],
 		   {ok,TargetTypeList}=db_appl_spec:read(target_type,ApplSpec),
 		   [rpc:call(PodNode,rd,add_target_resource_type,[TargetType],5000)||TargetType<-TargetTypeList],
 		   rpc:call(PodNode,rd,trade_resources,[],5000),
