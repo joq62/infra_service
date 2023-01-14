@@ -50,28 +50,68 @@ check_appl_status()->
 										       {ok,[]}/=db_pod_desired_state:read(appl_spec_list,PodNode)],
     A2=[{PodNode,ApplList}||{PodNode,{ok,ApplList}}<-A1],
     [
-     {'3_c200_c201_pod@c200',["math"]},
-     {'3_c200_c201_pod@c201',["math"]},
-     {'4_c200_c201_pod@c200',["infra_service"]},
-     {'4_c200_c201_pod@c201',["hw_conbee"]}
+     {'1_c200_c201_pod@c200',["common","resource_discovery"]},
+     {'1_c200_c201_pod@c201',["common","resource_discovery"]},
+     {'2_c200_c201_pod@c200',["common","resource_discovery"]},
+     {'2_c200_c201_pod@c201',["common","resource_discovery"]},
+     {'3_c200_c201_pod@c200',["common","resource_discovery","math"]},
+     {'3_c200_c201_pod@c201',["common","resource_discovery","math"]},
+     {'4_c200_c201_pod@c200',["common","infra_service","resource_discovery"]},
+     {'4_c200_c201_pod@c201',["hw_conbee","common","resource_discovery"]},
+     {'5_c200_c201_pod@c200',["common","resource_discovery"]},
+     {'5_c200_c201_pod@c201',["common","resource_discovery"]},
+     {'6_c200_c201_pod@c200',["common","resource_discovery"]},
+     {'6_c200_c201_pod@c201',["common","resource_discovery"]}
     ]=lists:sort(A2),
     
     PodApplSpecAppList=lists:append([pod_app_list(PodApplSpecList,[])||PodApplSpecList<-A2]),
     [
-     {'3_c200_c201_pod@c200',"math",math},
-     {'3_c200_c201_pod@c201',"math",math},
-     {'4_c200_c201_pod@c200',"infra_service",infra_service},
-     {'4_c200_c201_pod@c201',"hw_conbee",hw_conbee_app}
+     {'1_c200_c201_pod@c200',"common",common},{'1_c200_c201_pod@c200',"resource_discovery",resource_discovery},
+     {'1_c200_c201_pod@c201',"common",common},{'1_c200_c201_pod@c201',"resource_discovery",resource_discovery},
+     {'2_c200_c201_pod@c200',"common",common},{'2_c200_c201_pod@c200',"resource_discovery",resource_discovery},
+     {'2_c200_c201_pod@c201',"common",common},{'2_c200_c201_pod@c201',"resource_discovery",resource_discovery},
+     {'3_c200_c201_pod@c200',"common",common},{'3_c200_c201_pod@c200',"math",math},{'3_c200_c201_pod@c200',"resource_discovery",resource_discovery},
+     {'3_c200_c201_pod@c201',"common",common},{'3_c200_c201_pod@c201',"math",math},{'3_c200_c201_pod@c201',"resource_discovery",resource_discovery},
+     {'4_c200_c201_pod@c200',"common",common},{'4_c200_c201_pod@c200',"infra_service",infra_service},{'4_c200_c201_pod@c200',"resource_discovery",resource_discovery},
+     {'4_c200_c201_pod@c201',"common",common},{'4_c200_c201_pod@c201',"hw_conbee",hw_conbee_app},{'4_c200_c201_pod@c201',"resource_discovery",resource_discovery},
+     {'5_c200_c201_pod@c200',"common",common},{'5_c200_c201_pod@c200',"resource_discovery",resource_discovery},{'5_c200_c201_pod@c201',"common",common},
+     {'5_c200_c201_pod@c201',"resource_discovery",resource_discovery},{'6_c200_c201_pod@c200',"common",common},
+     {'6_c200_c201_pod@c200',"resource_discovery",resource_discovery},{'6_c200_c201_pod@c201',"common",common},
+     {'6_c200_c201_pod@c201',"resource_discovery",resource_discovery}
     ]=lists:sort(PodApplSpecAppList),
     
     MissingAppls=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-PodApplSpecAppList,
 				     pong/=rpc:call(PodNode,App,ping,[],5000)],
 
     [
+     {'1_c200_c201_pod@c200',"common",common},
+     {'1_c200_c201_pod@c200',"resource_discovery",resource_discovery},
+     {'1_c200_c201_pod@c201',"common",common},
+     {'1_c200_c201_pod@c201',"resource_discovery",resource_discovery},
+     {'2_c200_c201_pod@c200',"common",common},
+     {'2_c200_c201_pod@c200',"resource_discovery",resource_discovery},
+     {'2_c200_c201_pod@c201',"common",common},
+     {'2_c200_c201_pod@c201',"resource_discovery",resource_discovery},
+     {'3_c200_c201_pod@c200',"common",common},
      {'3_c200_c201_pod@c200',"math",math},
+     {'3_c200_c201_pod@c200',"resource_discovery",resource_discovery},
+     {'3_c200_c201_pod@c201',"common",common},
      {'3_c200_c201_pod@c201',"math",math},
+     {'3_c200_c201_pod@c201',"resource_discovery",resource_discovery},
+     {'4_c200_c201_pod@c200',"common",common},
      {'4_c200_c201_pod@c200',"infra_service",infra_service},
-     {'4_c200_c201_pod@c201',"hw_conbee",hw_conbee_app}
+     {'4_c200_c201_pod@c200',"resource_discovery",resource_discovery},
+     {'4_c200_c201_pod@c201',"common",common},
+     {'4_c200_c201_pod@c201',"hw_conbee",hw_conbee_app},
+     {'4_c200_c201_pod@c201',"resource_discovery",resource_discovery},
+     {'5_c200_c201_pod@c200',"common",common},
+     {'5_c200_c201_pod@c200',"resource_discovery",resource_discovery},
+     {'5_c200_c201_pod@c201',"common",common},
+     {'5_c200_c201_pod@c201',"resource_discovery",resource_discovery},
+     {'6_c200_c201_pod@c200',"common",common},
+     {'6_c200_c201_pod@c200',"resource_discovery",resource_discovery},
+     {'6_c200_c201_pod@c201',"common",common},
+     {'6_c200_c201_pod@c201',"resource_discovery",resource_discovery}
     ]=lists:sort(MissingAppls),
 
     ActiveAppls=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-PodApplSpecAppList,
@@ -99,19 +139,18 @@ desired_test()->
      {'c200_c201_parent@c200',"c200_c201_parent","c200_c201","c200"," -pa c200_c201 "," -pa c200_c201/*/ebin"," "}
     ]=db_parent_desired_state:read_all(),
     
+    
     [
-     {'1_c200_c201_pod@c200',"1_c200_c201_pod","c200_c201/1_c200_c201_pod",'c200_c201_parent@c200',[],"c200_c201","c200",[]," "},
-     {'1_c200_c201_pod@c201',"1_c200_c201_pod","c200_c201/1_c200_c201_pod",'c200_c201_parent@c201',[],"c200_c201","c201",[]," "},
-     {'2_c200_c201_pod@c200',"2_c200_c201_pod","c200_c201/2_c200_c201_pod",'c200_c201_parent@c200',[],"c200_c201","c200",[]," "},
-     {'2_c200_c201_pod@c201',"2_c200_c201_pod","c200_c201/2_c200_c201_pod",'c200_c201_parent@c201',[],"c200_c201","c201",[]," "},
-     {'3_c200_c201_pod@c200',"3_c200_c201_pod","c200_c201/3_c200_c201_pod",'c200_c201_parent@c200',["math"],"c200_c201","c200",[]," "},
-     {'3_c200_c201_pod@c201',"3_c200_c201_pod","c200_c201/3_c200_c201_pod",'c200_c201_parent@c201',["math"],"c200_c201","c201",[]," "},
-     {'4_c200_c201_pod@c200',"4_c200_c201_pod","c200_c201/4_c200_c201_pod",'c200_c201_parent@c200',["infra_service"],"c200_c201","c200",[]," "},
-     {'4_c200_c201_pod@c201',"4_c200_c201_pod","c200_c201/4_c200_c201_pod",'c200_c201_parent@c201',["hw_conbee"],"c200_c201","c201",[]," "},
-     {'5_c200_c201_pod@c200',"5_c200_c201_pod","c200_c201/5_c200_c201_pod",'c200_c201_parent@c200',[],"c200_c201","c200",[]," "},
-     {'5_c200_c201_pod@c201',"5_c200_c201_pod","c200_c201/5_c200_c201_pod",'c200_c201_parent@c201',[],"c200_c201","c201",[]," "},
-     {'6_c200_c201_pod@c200',"6_c200_c201_pod","c200_c201/6_c200_c201_pod",'c200_c201_parent@c200',[],"c200_c201","c200",[]," "},
-     {'6_c200_c201_pod@c201',"6_c200_c201_pod","c200_c201/6_c200_c201_pod",'c200_c201_parent@c201',[],"c200_c201","c201",[]," "}
+     {'1_c200_c201_pod@c200',"1_c200_c201_pod","c200_c201/1_c200_c201_pod",'c200_c201_parent@c200',["common","resource_discovery"],"c200_c201","c200",[]," "},
+     {'1_c200_c201_pod@c201',"1_c200_c201_pod","c200_c201/1_c200_c201_pod",'c200_c201_parent@c201',["common","resource_discovery"],"c200_c201","c201",[]," "},
+     {'2_c200_c201_pod@c200',"2_c200_c201_pod","c200_c201/2_c200_c201_pod",'c200_c201_parent@c200',["common","resource_discovery"],"c200_c201","c200",[]," "},
+     {'2_c200_c201_pod@c201',"2_c200_c201_pod","c200_c201/2_c200_c201_pod",'c200_c201_parent@c201',["common","resource_discovery"],"c200_c201","c201",[]," "},
+     {'3_c200_c201_pod@c200',"3_c200_c201_pod","c200_c201/3_c200_c201_pod",'c200_c201_parent@c200',["common","resource_discovery","math"],"c200_c201","c200",[]," "},
+     {'3_c200_c201_pod@c201',"3_c200_c201_pod","c200_c201/3_c200_c201_pod",'c200_c201_parent@c201',["common","resource_discovery","math"],"c200_c201","c201",[]," "},
+     {'4_c200_c201_pod@c200',"4_c200_c201_pod","c200_c201/4_c200_c201_pod",'c200_c201_parent@c200',["common","infra_service","resource_discovery"],"c200_c201","c200",[]," "},
+     {'4_c200_c201_pod@c201',"4_c200_c201_pod","c200_c201/4_c200_c201_pod",'c200_c201_parent@c201',["hw_conbee","common","resource_discovery"],"c200_c201","c201",[]," "},
+     {'5_c200_c201_pod@c200',"5_c200_c201_pod","c200_c201/5_c200_c201_pod",'c200_c201_parent@c200',["common","resource_discovery"],"c200_c201","c200",[]," "},{'5_c200_c201_pod@c201',"5_c200_c201_pod","c200_c201/5_c200_c201_pod",'c200_c201_parent@c201',["common","resource_discovery"],"c200_c201","c201",[]," "},
+     {'6_c200_c201_pod@c200',"6_c200_c201_pod","c200_c201/6_c200_c201_pod",'c200_c201_parent@c200',["common","resource_discovery"],"c200_c201","c200",[]," "},{'6_c200_c201_pod@c201',"6_c200_c201_pod","c200_c201/6_c200_c201_pod",'c200_c201_parent@c201',["common","resource_discovery"],"c200_c201","c201",[]," "}
     ]=lists:sort(db_pod_desired_state:read_all()),
 
     [
@@ -124,10 +163,13 @@ desired_test()->
     AllApplsDesiredState=[{PodNode,db_pod_desired_state:read(appl_spec_list,PodNode)}||PodNode<-lists:sort(db_pod_desired_state:get_all_id()),
 									     {ok,[]}/=db_pod_desired_state:read(appl_spec_list,PodNode)],
     [
-     {'3_c200_c201_pod@c200',{ok,["math"]}},
-     {'3_c200_c201_pod@c201',{ok,["math"]}},
-     {'4_c200_c201_pod@c200',{ok,["infra_service"]}},
-     {'4_c200_c201_pod@c201',{ok,["hw_conbee"]}}
+     {'1_c200_c201_pod@c200',{ok,["common","resource_discovery"]}},{'1_c200_c201_pod@c201',{ok,["common","resource_discovery"]}},
+     {'2_c200_c201_pod@c200',{ok,["common","resource_discovery"]}},{'2_c200_c201_pod@c201',{ok,["common","resource_discovery"]}},
+     {'3_c200_c201_pod@c200',{ok,["common","resource_discovery","math"]}},{'3_c200_c201_pod@c201',{ok,["common","resource_discovery","math"]}},
+     {'4_c200_c201_pod@c200',{ok,["common","infra_service","resource_discovery"]}},
+     {'4_c200_c201_pod@c201',{ok,["hw_conbee","common","resource_discovery"]}},
+     {'5_c200_c201_pod@c200',{ok,["common","resource_discovery"]}},{'5_c200_c201_pod@c201',{ok,["common","resource_discovery"]}},
+     {'6_c200_c201_pod@c200',{ok,["common","resource_discovery"]}},{'6_c200_c201_pod@c201',{ok,["common","resource_discovery"]}}
     ]=lists:sort(AllApplsDesiredState),
     
     ok.

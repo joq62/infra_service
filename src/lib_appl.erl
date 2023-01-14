@@ -191,11 +191,12 @@ prioritize([PodNode|T],Acc) ->
 %%--------------------------------------------------------------------
 load_desired_state(ClusterSpec)->
     {ok,PodsHostList}=db_cluster_spec:read(pods,ClusterSpec),
+  %  io:format("PodsHostList ~p~n",[{PodsHostList,?MODULE,?FUNCTION_NAME,?LINE}]),
     HostSpecList=[HostSpec||{_Num,HostSpec}<-PodsHostList],
-    ApplDeploymentSpecInfoList=[db_appl_deployment:read(ApplDeploymentId)||ApplDeploymentId<-db_appl_deployment:get_all_id(),
+    AllDeploymentId=db_appl_deployment:get_all_id(),
+    ApplDeploymentSpecInfoList=[db_appl_deployment:read(ApplDeploymentId)||ApplDeploymentId<-AllDeploymentId,
 			       {ok,ClusterSpec}==db_appl_deployment:read(cluster_spec,ApplDeploymentId)],
- %   io:format("ClusterSpec, ApplDeploymentSpecInfoList ~p~n",[{ClusterSpec,ApplDeploymentSpecInfoList,?MODULE,?FUNCTION_NAME,?LINE}]),
-    Result=main_load_desired_state(ApplDeploymentSpecInfoList,HostSpecList,[]),
+    _Result=main_load_desired_state(ApplDeploymentSpecInfoList,HostSpecList,[]),
  %   io:format("Result ~p~n",[{Result,?MODULE,?FUNCTION_NAME,?LINE}]).
     ok.
 
@@ -204,6 +205,24 @@ main_load_desired_state([],_HostSpecList,Acc)->
 main_load_desired_state([ApplDeploymentSpec|T],HostSpecList,Acc) ->
     Result=load_desired_state(ApplDeploymentSpec,HostSpecList,[]),
     main_load_desired_state(T,HostSpecList,[Result|Acc]).
+
+%%-- Affinity on each pod each_pod
+load_desired_state({_SpecId,_ApplSpec,_Vsn,_ClusterSpec,_,each_pod},[],Acc)->
+    Acc;
+load_desired_state({SpecId,ApplSpec,_Vsn,ClusterSpec,1,each_pod},[HostSpec|T],Acc)->
+    RightHost=[PodNode||PodNode<-db_pod_desired_state:get_all_id(),
+			{ok,HostSpec}==db_pod_desired_state:read(host_spec,PodNode)],
+    NodeApplSpecList=[{PodNode,db_pod_desired_state:read(appl_spec_list,PodNode)}||PodNode<-RightHost],
+    Candidates=[PodNode||{PodNode,{ok,ApplSpecList}}<-NodeApplSpecList,
+			 false==lists:member(ApplSpec,ApplSpecList),
+			 {ok,ClusterSpec}==db_pod_desired_state:read(cluster_spec,PodNode)],
+    AddResult=[{db_pod_desired_state:add_appl_list(ApplSpec,PodNode),ApplSpec,PodNode,HostSpec}||PodNode<-Candidates],
+    ErrorResult=[{error,["ERROR: Aborted ApplSpec,PodNode,HostSpec : ",Reason,ApplSpec,PodNode,HostSpec]}||
+		    {{aborted,Reason},ApplSpec,PodNode,HostSpec}<-AddResult],
+    OkResult=[ok||{atomic,ok}<-AddResult],
+    NewAcc=lists:append([OkResult,ErrorResult,Acc]),
+    load_desired_state({SpecId,ApplSpec,_Vsn,ClusterSpec,1,each_pod},T,NewAcc);
+
 
 %%-- Affinity any_host    
 load_desired_state({_SpecId,_ApplSpec,_Vsn,_ClusterSpec,0,any_host},_HostList,Acc)->
