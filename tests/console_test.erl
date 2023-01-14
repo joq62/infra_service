@@ -28,6 +28,9 @@ start([ClusterSpec,_Arg2])->
     ok=initiate_test(ClusterSpec),
     ok=desired_test(),
     ok=check_appl_status(),
+
+    ok=create_parents(),
+        
   
    %ok=create_connect(ClusterSpec,StartHostSpec),
 %    ok=init_test(ClusterSpec,StartHostSpec),
@@ -38,6 +41,17 @@ start([ClusterSpec,_Arg2])->
   %  timer:sleep(2000),
     ok.
 
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+create_parents()->
+    glurk=parent_server:stopped_nodes(),
+    
+    
+
+    ok.
 
 %%--------------------------------------------------------------------
 %% @doc
