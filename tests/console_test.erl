@@ -29,7 +29,7 @@ start([ClusterSpec,_Arg2])->
     ok=desired_test(),
     ok=check_appl_status(),
 
-    ok=create_parents(),
+    ok=secure_parents_pods_started(),
         
   
    %ok=create_connect(ClusterSpec,StartHostSpec),
@@ -46,11 +46,28 @@ start([ClusterSpec,_Arg2])->
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-create_parents()->
-    glurk=parent_server:stopped_nodes(),
+secure_parents_pods_started()->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+      
+    [rpc:call(Pod,init,stop,[],5000)||Pod<-db_parent_desired_state:get_all_id()],
+    timer:sleep(3000),
+    [rpc:call(Pod,init,stop,[],5000)||Pod<-db_pod_desired_state:get_all_id()],
+    timer:sleep(3000),
+    
+    %------
     
     
+    {ok,StoppedParents}=parent_server:stopped_nodes(),
+    [ok,ok]=[parent_server:create_node(Parent)||Parent<-StoppedParents],
+    {ok,ActiveParents}=parent_server:active_nodes(),
+    [pong,pong]=[rpc:call(Pod1,net_adm,ping,[Pod2],5000)||Pod1<-ActiveParents,
+							  Pod2<-ActiveParents,
+							  Pod1/=Pod2],
 
+    {ok,StoppedPods}=pod_server:stopped_nodes(),
+ %   [parent_server:create_node(Parent)||Parent<-StoppedParents],
+    io:format("nodes() ~p~n",[{nodes(),?MODULE,?FUNCTION_NAME}]),
+    
     ok.
 
 %%--------------------------------------------------------------------
@@ -142,6 +159,7 @@ desired_test()->
      {'6_c200_c201_pod@c200',{ok,["common","resource_discovery"]}},{'6_c200_c201_pod@c201',{ok,["common","resource_discovery"]}}
     ]=lists:sort(AllApplsDesiredState),
     
+
     ok.
 
 %%--------------------------------------------------------------------

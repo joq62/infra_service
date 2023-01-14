@@ -97,6 +97,7 @@ init([]) ->
     {ok,_}=appl_server:start(),
     pong=appl_server:ping(),
 
+  
     rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,"Servere started"]),
 
     {ok, #state{}}.   
@@ -115,6 +116,8 @@ init([]) ->
 handle_call({initiate,ClusterSpec},_From, State) ->
     Reply=case State#state.cluster_spec of
 	      undefined->
+		  {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
+		  erlang:set_cookie(node(),list_to_atom(Cookie)),
 		  NewState=State#state{cluster_spec=ClusterSpec},
 		  ok;
 	      CSpec->
@@ -146,10 +149,6 @@ handle_call({ping},_From, State) ->
     Reply=pong,
     {reply, Reply, State};
 
-
-handle_call({ping},_From, State) ->
-    Reply=pong,
-    {reply, Reply, State};
 
 handle_call(Request, From, State) ->
     Reply = {unmatched_signal,?MODULE,Request,From},

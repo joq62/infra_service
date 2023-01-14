@@ -147,7 +147,7 @@ handle_call({create_node,ParentNode},_From, State) ->
 		  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: Not initiated : ",undefined]]),
 		  {error,["Not initiated : ",undefined]};
 	      ClusterSpec->
-		  case lib_parent:create_node(ParentNode,ClusterSpec) of
+		  case lib_parent:create_node(ParentNode) of
 		      ok->
 			  rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK: created node : ",ParentNode]]),
 			  ok;
