@@ -53,33 +53,32 @@ desired_appls()->
 %% @end
 %%--------------------------------------------------------------------
 active_appls()->
-    AllNodes=db_pod_desired_state:get_all_id(),
-    RunningNodesDir=[{Node,db_appl_desired_state:read(pod_dir)}||Node<-AllNodes,
-								pong==net_adm:ping(Node)],
-    ActiveNodes=[Node||{Node,{ok,PodDir}}<-RunningNodesDir,
-		       rpc:call(Node,filelib,is_dir,[PodDir],5000)],
-    [rpc:call(Node,init,stop,[],3000)||{Node,{ok,_PodDir}}<-RunningNodesDir,
-				       false==lists:member(Node,ActiveNodes)],
-    {ok,ActiveNodes}.
+    A1=[{PodNode,db_pod_desired_state:read(appl_spec_list,PodNode)}||PodNode<-db_pod_desired_state:get_all_id()],
+    A2=[{PodNode,ApplList}||{PodNode,{ok,ApplList}}<-A1],
+    PodApplSpecAppList=lists:append([pod_app_list(PodApplSpecList,[])||PodApplSpecList<-A2]),
+    {ok,StoppedAppls}=stopped_appls(),
+    ActiveAppls=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-PodApplSpecAppList,
+					false==lists:member({PodNode,ApplSpec,App},StoppedAppls)],
+    {ok,ActiveAppls}.
     %%--------------------------------------------------------------------
 %% @doc
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
 stopped_appls()->
-    AllNodes=db_appl_desired_state:get_all_id(),
-    {ok,ActiveNodes}=active_appls(),
-    StoppedNodes=[Node||Node<-AllNodes,
-			false==lists:member(Node,ActiveNodes)],
-    {ok,StoppedNodes}.
+    A1=[{PodNode,db_pod_desired_state:read(appl_spec_list,PodNode)}||PodNode<-db_pod_desired_state:get_all_id()],
+    A2=[{PodNode,ApplList}||{PodNode,{ok,ApplList}}<-A1],
+    PodApplSpecAppList=lists:append([pod_app_list(PodApplSpecList,[])||PodApplSpecList<-A2]),
+    StoppedAppls=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-PodApplSpecAppList,
+					  pong/=rpc:call(PodNode,App,ping,[],5000)],
+    {ok,StoppedAppls}.
     
-
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-
+pod_app_list({_PodNode,[]},Acc)->
+    Acc;
+pod_app_list({PodNode,[ApplSpec|T]},Acc)->
+   {ok,App}=db_appl_spec:read(app,ApplSpec),
+    NewAcc=[{PodNode,ApplSpec,App}|Acc],
+    pod_app_list({PodNode,T},NewAcc).
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec

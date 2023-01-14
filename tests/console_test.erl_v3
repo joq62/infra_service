@@ -46,7 +46,43 @@ start([ClusterSpec,_Arg2])->
 %%--------------------------------------------------------------------
 check_appl_status()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-    {ok,StoppedApplsInfo}=lib_appl:stopped_appls(),
+    A1=[{PodNode,db_pod_desired_state:read(appl_spec_list,PodNode)}||PodNode<-lists:sort(db_pod_desired_state:get_all_id()),
+										       {ok,[]}/=db_pod_desired_state:read(appl_spec_list,PodNode)],
+    A2=[{PodNode,ApplList}||{PodNode,{ok,ApplList}}<-A1],
+    [
+     {'1_c200_c201_pod@c200',["common","resource_discovery"]},
+     {'1_c200_c201_pod@c201',["common","resource_discovery"]},
+     {'2_c200_c201_pod@c200',["common","resource_discovery"]},
+     {'2_c200_c201_pod@c201',["common","resource_discovery"]},
+     {'3_c200_c201_pod@c200',["common","resource_discovery","math"]},
+     {'3_c200_c201_pod@c201',["common","resource_discovery","math"]},
+     {'4_c200_c201_pod@c200',["common","infra_service","resource_discovery"]},
+     {'4_c200_c201_pod@c201',["hw_conbee","common","resource_discovery"]},
+     {'5_c200_c201_pod@c200',["common","resource_discovery"]},
+     {'5_c200_c201_pod@c201',["common","resource_discovery"]},
+     {'6_c200_c201_pod@c200',["common","resource_discovery"]},
+     {'6_c200_c201_pod@c201',["common","resource_discovery"]}
+    ]=lists:sort(A2),
+    
+    PodApplSpecAppList=lists:append([pod_app_list(PodApplSpecList,[])||PodApplSpecList<-A2]),
+    [
+     {'1_c200_c201_pod@c200',"common",common},{'1_c200_c201_pod@c200',"resource_discovery",resource_discovery},
+     {'1_c200_c201_pod@c201',"common",common},{'1_c200_c201_pod@c201',"resource_discovery",resource_discovery},
+     {'2_c200_c201_pod@c200',"common",common},{'2_c200_c201_pod@c200',"resource_discovery",resource_discovery},
+     {'2_c200_c201_pod@c201',"common",common},{'2_c200_c201_pod@c201',"resource_discovery",resource_discovery},
+     {'3_c200_c201_pod@c200',"common",common},{'3_c200_c201_pod@c200',"math",math},{'3_c200_c201_pod@c200',"resource_discovery",resource_discovery},
+     {'3_c200_c201_pod@c201',"common",common},{'3_c200_c201_pod@c201',"math",math},{'3_c200_c201_pod@c201',"resource_discovery",resource_discovery},
+     {'4_c200_c201_pod@c200',"common",common},{'4_c200_c201_pod@c200',"infra_service",infra_service},{'4_c200_c201_pod@c200',"resource_discovery",resource_discovery},
+     {'4_c200_c201_pod@c201',"common",common},{'4_c200_c201_pod@c201',"hw_conbee",hw_conbee_app},{'4_c200_c201_pod@c201',"resource_discovery",resource_discovery},
+     {'5_c200_c201_pod@c200',"common",common},{'5_c200_c201_pod@c200',"resource_discovery",resource_discovery},{'5_c200_c201_pod@c201',"common",common},
+     {'5_c200_c201_pod@c201',"resource_discovery",resource_discovery},{'6_c200_c201_pod@c200',"common",common},
+     {'6_c200_c201_pod@c200',"resource_discovery",resource_discovery},{'6_c200_c201_pod@c201',"common",common},
+     {'6_c200_c201_pod@c201',"resource_discovery",resource_discovery}
+    ]=lists:sort(PodApplSpecAppList),
+    
+    MissingAppls=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-PodApplSpecAppList,
+				     pong/=rpc:call(PodNode,App,ping,[],5000)],
+
     [
      {'1_c200_c201_pod@c200',"common",common},
      {'1_c200_c201_pod@c200',"resource_discovery",resource_discovery},
@@ -76,12 +112,20 @@ check_appl_status()->
      {'6_c200_c201_pod@c200',"resource_discovery",resource_discovery},
      {'6_c200_c201_pod@c201',"common",common},
      {'6_c200_c201_pod@c201',"resource_discovery",resource_discovery}
-    ]=lists:sort(StoppedApplsInfo),
+    ]=lists:sort(MissingAppls),
 
-    {ok,[]}=lib_appl:active_appls(),
+    ActiveAppls=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-PodApplSpecAppList,
+					 false==lists:member({PodNode,ApplSpec,App},MissingAppls)],
+    []=ActiveAppls,
 
     ok.
 
+pod_app_list({_PodNode,[]},Acc)->
+    Acc;
+pod_app_list({PodNode,[ApplSpec|T]},Acc)->
+   {ok,App}=db_appl_spec:read(app,ApplSpec),
+    NewAcc=[{PodNode,ApplSpec,App}|Acc],
+    pod_app_list({PodNode,T},NewAcc).
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
