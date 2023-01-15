@@ -53,7 +53,7 @@ desired_nodes()->
 %%--------------------------------------------------------------------
 active_nodes()->
     AllNodes=db_pod_desired_state:get_all_id(),
-    RunningNodesDir=[{Node,db_pod_desired_state:read(pod_dir)}||Node<-AllNodes,
+    RunningNodesDir=[{Node,db_pod_desired_state:read(pod_dir,Node)}||Node<-AllNodes,
 								pong==net_adm:ping(Node)],
     ActiveNodes=[Node||{Node,{ok,PodDir}}<-RunningNodesDir,
 		       rpc:call(Node,filelib,is_dir,[PodDir],5000)],

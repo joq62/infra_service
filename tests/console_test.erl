@@ -50,9 +50,9 @@ secure_parents_pods_started()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
       
     [rpc:call(Pod,init,stop,[],5000)||Pod<-db_parent_desired_state:get_all_id()],
-    timer:sleep(3000),
+    timer:sleep(2000),
     [rpc:call(Pod,init,stop,[],5000)||Pod<-db_pod_desired_state:get_all_id()],
-    timer:sleep(3000),
+    timer:sleep(1000),
     
     %------
     
@@ -60,16 +60,39 @@ secure_parents_pods_started()->
     {ok,StoppedParents}=parent_server:stopped_nodes(),
     [ok,ok]=[parent_server:create_node(Parent)||Parent<-StoppedParents],
     {ok,ActiveParents}=parent_server:active_nodes(),
-    [pong,pong]=[rpc:call(Pod1,net_adm,ping,[Pod2],5000)||Pod1<-ActiveParents,
+    [{pong,pong},{pong,pong}]=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
 							  Pod2<-ActiveParents,
 							  Pod1/=Pod2],
-
+    {ok,[_,_]}=parent_server:active_nodes(),
+    {ok,[]}=parent_server:stopped_nodes(),
+    
     {ok,StoppedPods}=pod_server:stopped_nodes(),
- %   [parent_server:create_node(Parent)||Parent<-StoppedParents],
-    io:format("nodes() ~p~n",[{nodes(),?MODULE,?FUNCTION_NAME}]),
+    [ok,ok,ok,ok,ok,ok,ok,ok,ok,ok,ok,ok]=[create_pod(Pod)||Pod<-StoppedPods],
+    [rpc:call(Pod1,net_adm,ping,[Pod2],5000)||Pod1<-ActiveParents,
+					      Pod2<-StoppedPods,
+					      Pod1/=Pod2],
+    
+    {ok,ActivePods}=pod_server:active_nodes(),
+    [
+     '1_c200_c201_pod@c200','1_c200_c201_pod@c201',
+     '2_c200_c201_pod@c200','2_c200_c201_pod@c201',
+     '3_c200_c201_pod@c200','3_c200_c201_pod@c201',
+     '4_c200_c201_pod@c200','4_c200_c201_pod@c201',
+     '5_c200_c201_pod@c200','5_c200_c201_pod@c201',
+     '6_c200_c201_pod@c200','6_c200_c201_pod@c201'
+    ]=lists:sort(ActivePods),
+    {ok,[]}=pod_server:stopped_nodes(),
+
+    io:format("nodes ~p~n",[{nodes(),?MODULE,?FUNCTION_NAME}]),
     
     ok.
-
+create_pod(PodNode)->
+    {ok,ParentNode}=db_pod_desired_state:read(parent_node,PodNode),
+    {ok,NodeName}=db_pod_desired_state:read(node_name,PodNode),
+    {ok,PodDir}=db_pod_desired_state:read(pod_dir,PodNode),
+    {ok,PaArgsList}=db_pod_desired_state:read(pa_args_list,PodNode),
+    {ok,EnvArgs}=db_pod_desired_state:read(env_args,PodNode),
+    pod_server:create_pod(ParentNode,NodeName,PodDir,PaArgsList,EnvArgs).
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec

@@ -72,4 +72,4 @@ eunit:
 	rebar3 compile;	
 	cp _build/default/lib/*/ebin/* ebin;
 	rm -rf _build*;
-	erl -pa * -pa */ebin -pa ebin -pa tests_ebin -sname do_test -run $(m) start $(a) $(b) -setcookie test_cookie -hidden
+	erl -pa * -pa */ebin -pa ebin -pa tests_ebin -sname do_test -run $(m) start $(a) $(b) -setcookie test_cookie
