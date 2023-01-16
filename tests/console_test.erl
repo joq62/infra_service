@@ -28,8 +28,10 @@ start([ClusterSpec,_Arg2])->
     ok=initiate_test(ClusterSpec),
     ok=desired_test(),
     ok=check_appl_status(),
-    ok=secure_parents_pods_started(),
-    ok=install_appls(),
+ %   ok=secure_parents_pods_started(),
+ %   ok=install_appls(),
+    ok=orchistrate(),
+    
         
   
    %ok=create_connect(ClusterSpec,StartHostSpec),
@@ -41,6 +43,55 @@ start([ClusterSpec,_Arg2])->
   %  timer:sleep(2000),
     ok.
 
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+orchistrate()->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+
+    io:format("Stopped Parents ~p~n",[{parent_server:stopped_nodes(),?MODULE,?FUNCTION_NAME,?LINE}]),
+    io:format("Stopped Pods ~p~n",[{pod_server:stopped_nodes(),?MODULE,?FUNCTION_NAME,?LINE}]),
+    io:format("Stopped Appls ~p~n",[{appl_server:stopped_appls(),?MODULE,?FUNCTION_NAME,?LINE}]),
+
+    
+
+    % 1). check and restart stopped parents
+    {ok,StoppedParents}=parent_server:stopped_nodes(),
+    [ok,ok]=[parent_server:create_node(Parent)||Parent<-StoppedParents],
+    {ok,ActiveParents}=parent_server:active_nodes(),
+    [{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
+								   Pod2<-ActiveParents,
+								   Pod1/=Pod2],
+    % 2). check and restart stopped pods
+    {ok,StoppedPods}=pod_server:stopped_nodes(),
+    [create_pod(Pod)||Pod<-StoppedPods],
+    [rpc:call(Pod1,net_adm,ping,[Pod2],5000)||Pod1<-ActiveParents,
+					      Pod2<-StoppedPods,
+					      Pod1/=Pod2],
+    % 3). check and restart stopped appls
+    {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),
+    StoppedCommon=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+					   common==App],
+    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedCommon,[])],
+    StoppedResourceDiscovery=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+					   resource_discovery==App],
+    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedResourceDiscovery,[])],
+    StoppedUserApplications=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+						     common/=App,
+						     resource_discovery/=App,
+						     db_etcd/=App,
+						     nodelog/=App,
+						     infra_service/=App],
+
+    % Radnomly kill a node or parent 
+
+
+    % Wait 30 seconds to redo
+    timer:sleep(20*1000),
+    orchistrate().
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
