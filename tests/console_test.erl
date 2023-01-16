@@ -60,7 +60,7 @@ orchistrate()->
 
     % 1). check and restart stopped parents
     {ok,StoppedParents}=parent_server:stopped_nodes(),
-    [ok,ok]=[parent_server:create_node(Parent)||Parent<-StoppedParents],
+    [parent_server:create_node(Parent)||Parent<-StoppedParents],
     {ok,ActiveParents}=parent_server:active_nodes(),
     [{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
 								   Pod2<-ActiveParents,
@@ -75,16 +75,17 @@ orchistrate()->
     {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),
     StoppedCommon=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
 					   common==App],
-    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedCommon,[])],
+    [{error,Reason}||{error,Reason}<-create_appl(StoppedCommon,[])],
     StoppedResourceDiscovery=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
 					   resource_discovery==App],
-    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedResourceDiscovery,[])],
+    [{error,Reason}||{error,Reason}<-create_appl(StoppedResourceDiscovery,[])],
     StoppedUserApplications=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
 						     common/=App,
 						     resource_discovery/=App,
 						     db_etcd/=App,
 						     nodelog/=App,
 						     infra_service/=App],
+    [{error,Reason}||{error,Reason}<-create_appl(StoppedUserApplications,[])],
 
     % Radnomly kill a node or parent 
 
