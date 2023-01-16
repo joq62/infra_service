@@ -28,8 +28,8 @@ start([ClusterSpec,_Arg2])->
     ok=initiate_test(ClusterSpec),
     ok=desired_test(),
     ok=check_appl_status(),
-
     ok=secure_parents_pods_started(),
+    ok=install_appls(),
         
   
    %ok=create_connect(ClusterSpec,StartHostSpec),
@@ -40,6 +40,53 @@ start([ClusterSpec,_Arg2])->
   %  init:stop(),
   %  timer:sleep(2000),
     ok.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+install_appls()->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+    
+    {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),
+    {ok,[]}=appl_server:active_appls(),
+
+    %-- StoppedApplInfo={PodNode,ApplSpec,App}
+    % Load and Start common 
+    StoppedCommon=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+					   common==App],
+    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedCommon,[])],
+    % Load and Start resource_discovery
+    StoppedResourceDiscovery=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+					   resource_discovery==App],
+    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedResourceDiscovery,[])],
+
+    % Load and Start nodelog  
+    % Load and Start db_etcd 
+    % Load and star infra_service
+
+    % Load and start applications
+
+    StoppedUserApplications=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+						     common/=App,
+						     resource_discovery/=App,
+						     db_etcd/=App,
+						     nodelog/=App,
+						     infra_service/=App],
+    
+    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedUserApplications,[])],
+
+    ok.
+
+create_appl([],Acc)->
+    Acc;
+create_appl([{PodNode,ApplSpec,App}|T],Acc)->
+    Result=appl_server:create_appl(ApplSpec,PodNode),
+    io:format("Ping  ~p~n",[{rpc:call(PodNode,App,ping,[],2000),PodNode,ApplSpec,?MODULE,?FUNCTION_NAME,?LINE}]),
+    io:format("Creat Appl Result ~p~n",[{Result,PodNode,ApplSpec,?MODULE,?FUNCTION_NAME,?LINE}]),
+    create_appl(T,[{Result,PodNode,ApplSpec,App}|Acc]).
+    
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -100,6 +147,13 @@ create_pod(PodNode)->
 %%--------------------------------------------------------------------
 check_appl_status()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+
+    [rpc:call(Pod,init,stop,[],5000)||Pod<-db_parent_desired_state:get_all_id()],
+    timer:sleep(2000),
+    [rpc:call(Pod,init,stop,[],5000)||Pod<-db_pod_desired_state:get_all_id()],
+    timer:sleep(1000),
+
+
     {ok,StoppedApplsInfo}=lib_appl:stopped_appls(),
     [
      {'1_c200_c201_pod@c200',"common",common},
@@ -212,143 +266,13 @@ initiate_test(ClusterSpec)->
 %% Description: Based on hosts.config file checks which hosts are avaible
 %% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
 %% --------------------------------------------------------------------
-create_connect(ClusterSpec,StartHostSpec)->
-    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-    
-    %% Ensure that config is started proprely , strange!!
-    ok=db_config:create_table(),
-    {atomic,ok}=db_config:set(cluster_spec,ClusterSpec),
-    ClusterSpec=db_config:get(cluster_spec),
-    
-      % Create first connect node with right cookie
-    {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
-    erlang:set_cookie(node(),list_to_atom(Cookie)),
-    
-    % create connect nodes
-    {ok,_}=connect_server:create_dbase_info(ClusterSpec), 
-    ConnectStart=connect_server:create_connect_nodes(ClusterSpec),
-    []=[{error,Reason}||{error,Reason}<-ConnectStart],
-    
-    % Create connect pod
-    
-    % Create controller and  worker nodes 
 
-    {Controllers,[]}=pod_server:create_controller_pods(ClusterSpec),
-    {Workers,[]}=pod_server:create_worker_pods(ClusterSpec),
-   
-    % Install basic applications on each node but connect 
-    RC1=[appl_server:new_on_pod("common",PodNode,ClusterSpec,10*1000)||PodNode<-Controllers],
-    []=[{error,Reason}||{error,Reason}<-RC1],
-    []=[{error,PodNode}||PodNode<-Controllers,
-			 false==lists:keymember(common,1,rpc:call(PodNode,application,which_applications,[],1000))],
-
-    RC2=[appl_server:new_on_pod("resource_discovery",PodNode,ClusterSpec,10*1000)||PodNode<-Controllers],
-    []=[{error,Reason}||{error,Reason}<-RC2],
-    []=[{error,PodNode}||PodNode<-Controllers,
-			 false==lists:keymember(resource_discovery,1,rpc:call(PodNode,application,which_applications,[],1000))],
-
-    RW1=[appl_server:new_on_pod("common",PodNode,ClusterSpec,10*1000)||PodNode<-Workers],
-    []=[{error,Reason}||{error,Reason}<-RW1],
-    []=[{error,PodNode}||PodNode<-Workers,
-			 false==lists:keymember(common,1,rpc:call(PodNode,application,which_applications,[],1000))],
-
-    RW2=[appl_server:new_on_pod("resource_discovery",PodNode,ClusterSpec,10*1000)||PodNode<-Workers],
-    []=[{error,Reason}||{error,Reason}<-RW2],
-    []=[{error,PodNode}||PodNode<-Workers,
-			 false==lists:keymember(resource_discovery,1,rpc:call(PodNode,application,which_applications,[],1000))],
-
-    
-	
-    %% Initiate the first controller before hand over to infra_service
-    [FirstController|_]=lists:sort(Controllers),
-    
-    ok=appl_server:new_on_pod("nodelog",FirstController,ClusterSpec,10*1000), 
-    ok=appl_server:new_on_pod("db_etcd",FirstController,ClusterSpec,10*1000), 
-    
-  
-    % hang up
-
-    
-    AllApps=[{PodNode,rpc:call(PodNode,application,which_applications,[],1000)}||PodNode<-lists:append(Controllers,Workers)],
-    io:format("AllApps ~p~n",[{AllApps,?MODULE,?FUNCTION_NAME}]),
-
-    
-
-    % Kill install node
-    
-
-    ok.
 %% --------------------------------------------------------------------
 %% Function: available_hosts()
 %% Description: Based on hosts.config file checks which hosts are avaible
 %% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
 %% --------------------------------------------------------------------
-init_test(ClusterSpec,StartHostSpec)->
-    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-    
-    %% Ensure that config is started proprely , strange!!
-    ok=db_config:create_table(),
-    {atomic,ok}=db_config:set(cluster_spec,ClusterSpec),
-    ClusterSpec=db_config:get(cluster_spec),
-    
-      % Create first connect node with right cookie
-    {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
-    erlang:set_cookie(node(),list_to_atom(Cookie)),
-    
-    % create connect nodes
-    {ok,_}=connect_server:create_dbase_info(ClusterSpec), 
-    ConnectStart=connect_server:create_connect_nodes(ClusterSpec),
-    []=[{error,Reason}||{error,Reason}<-ConnectStart],
-    
-    % Create connect pod
-    
-    % Create controller and  worker nodes 
 
-    {Controllers,[]}=pod_server:create_controller_pods(ClusterSpec),
-    {Workers,[]}=pod_server:create_worker_pods(ClusterSpec),
-   
-    % Install basic applications on each node but connect 
-    RC1=[appl_server:new_on_pod("common",PodNode,ClusterSpec,10*1000)||PodNode<-Controllers],
-    []=[{error,Reason}||{error,Reason}<-RC1],
-    []=[{error,PodNode}||PodNode<-Controllers,
-			 false==lists:keymember(common,1,rpc:call(PodNode,application,which_applications,[],1000))],
-
-    RC2=[appl_server:new_on_pod("resource_discovery",PodNode,ClusterSpec,10*1000)||PodNode<-Controllers],
-    []=[{error,Reason}||{error,Reason}<-RC2],
-    []=[{error,PodNode}||PodNode<-Controllers,
-			 false==lists:keymember(resource_discovery,1,rpc:call(PodNode,application,which_applications,[],1000))],
-
-    RW1=[appl_server:new_on_pod("common",PodNode,ClusterSpec,10*1000)||PodNode<-Workers],
-    []=[{error,Reason}||{error,Reason}<-RW1],
-    []=[{error,PodNode}||PodNode<-Workers,
-			 false==lists:keymember(common,1,rpc:call(PodNode,application,which_applications,[],1000))],
-
-    RW2=[appl_server:new_on_pod("resource_discovery",PodNode,ClusterSpec,10*1000)||PodNode<-Workers],
-    []=[{error,Reason}||{error,Reason}<-RW2],
-    []=[{error,PodNode}||PodNode<-Workers,
-			 false==lists:keymember(resource_discovery,1,rpc:call(PodNode,application,which_applications,[],1000))],
-
-    
-	
-    %% Initiate the first controller before hand over to infra_service
-    [FirstController|_]=lists:sort(Controllers),
-    
-    ok=appl_server:new_on_pod("nodelog",FirstController,ClusterSpec,10*1000), 
-    ok=appl_server:new_on_pod("db_etcd",FirstController,ClusterSpec,10*1000), 
-    
-  
-    % hang up
-
-    
-    AllApps=[{PodNode,rpc:call(PodNode,application,which_applications,[],1000)}||PodNode<-lists:append(Controllers,Workers)],
-    io:format("AllApps ~p~n",[{AllApps,?MODULE,?FUNCTION_NAME}]),
-
-    
-
-    % Kill install node
-    
-
-    ok.
 %% --------------------------------------------------------------------
 %% Function: available_hosts()
 %% Description: Based on hosts.config file checks which hosts are avaible

@@ -83,7 +83,7 @@ create_check_nodes_test(ClusterSpec)->
 
 
 create_pod(PodNode)->
-    {PodNode,NodeName,PodDir,ParentNode,PaArgList,_ApplSpecList,_HostSpec,EnvArgs}=db_pod_desired_state:read(PodNode),
+    {PodNode,NodeName,PodDir,ParentNode,PaArgList,_ApplSpecList,_ClusterSpec,_HostSpec,EnvArgs}=db_pod_desired_state:read(PodNode),
     pod_server:create_pod(ParentNode,NodeName,PodDir,PaArgList,EnvArgs).
 
 %%--------------------------------------------------------------------

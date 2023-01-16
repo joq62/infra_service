@@ -69,9 +69,23 @@ stopped_appls()->
     A1=[{PodNode,db_pod_desired_state:read(appl_spec_list,PodNode)}||PodNode<-db_pod_desired_state:get_all_id()],
     A2=[{PodNode,ApplList}||{PodNode,{ok,ApplList}}<-A1],
     PodApplSpecAppList=lists:append([pod_app_list(PodApplSpecList,[])||PodApplSpecList<-A2]),
+    
     StoppedAppls=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-PodApplSpecAppList,
-					  pong/=rpc:call(PodNode,App,ping,[],5000)],
+					  false==is_app_running(App,PodNode)],
     {ok,StoppedAppls}.
+    
+
+is_app_running(App,PodNode)->
+    Result=case rpc:call(PodNode,application,which_applications,[],5000) of
+	       {badrpc,_}->
+		   false;
+	       Applications->
+		   lists:keymember(App,1,Applications)
+	   end,
+    Result.
+
+
+    
     
 pod_app_list({_PodNode,[]},Acc)->
     Acc;
@@ -101,7 +115,7 @@ create_appl(ApplSpec,PodNode,TimeOut)->
     Result=case do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut) of
 	       {error,Reason}->
 		   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
-		   {error,Reason};
+		   {error,["Error during do_start : ",Reason,ApplSpec,PodNode,?MODULE,?FUNCTION_NAME,?LINE]};
 	       ok->
 		   {ok,LocalTypeList}=db_appl_spec:read(local_type,ApplSpec),
 		   [rpc:call(PodNode,rd,add_local_resource,[LocalType,PodNode],5000)||LocalType<-LocalTypeList],
@@ -120,38 +134,32 @@ create_appl(ApplSpec,PodNode,TimeOut)->
 %% @end
 %%--------------------------------------------------------------------
 do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut)->
-    Result= case rpc:call(PodNode,file,make_dir,[ApplDir],5000) of
+    Result= case appl:git_clone_to_dir(PodNode,PodApplGitPath,ApplDir) of
 		{error,Reason}->
 		    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
-		    {error,Reason};
-		ok->
-		    case appl:git_clone_to_dir(PodNode,PodApplGitPath,ApplDir) of
+		    {error,["Error when cloning : ", Reason,PodNode,PodApplGitPath,ApplDir,?MODULE,?FUNCTION_NAME,?LINE]};
+		{ok,_}->
+		    {ok,PodApp}=db_appl_spec:read(app,ApplSpec),
+		    ApplEbin=filename:join([ApplDir,"ebin"]),
+		    Paths=[ApplEbin],
+		    case appl:load(PodNode,PodApp,Paths) of
 			{error,Reason}->
 			    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
-			    {error,Reason};
-			{ok,_}->
-			    {ok,PodApp}=db_appl_spec:read(app,ApplSpec),
-			    ApplEbin=filename:join([ApplDir,"ebin"]),
-			    Paths=[ApplEbin],
-			    case appl:load(PodNode,PodApp,Paths) of
+			    {error,["Error when loading application : ",Reason,PodNode,PodApp,Paths,?MODULE,?FUNCTION_NAME,?LINE]}; 
+			ok->
+			    case appl:start(PodNode,PodApp,TimeOut) of
 				{error,Reason}->
 				    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
-				    {error,Reason}; 
+				    {error,Reason};
 				ok->
-				    case appl:start(PodNode,PodApp,TimeOut) of
-					{error,Reason}->
-					    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
-					    {error,Reason};
-					ok->
-					    {ok,LocalTypeList}=db_appl_spec:read(local_type,ApplSpec),
-					    [rpc:call(PodNode,rd,add_local_resource,[LocalType,PodNode],5000)||LocalType<-LocalTypeList],
+				    {ok,LocalTypeList}=db_appl_spec:read(local_type,ApplSpec),
+				    [rpc:call(PodNode,rd,add_local_resource,[LocalType,PodNode],5000)||LocalType<-LocalTypeList],
 						%   [rd:add_target_resource_type(LocalType)||LocalType<-LocalTypeList],
-					    {ok,TargetTypeList}=db_appl_spec:read(target_type,ApplSpec),
-					    [rpc:call(PodNode,rd,add_target_resource_type,[TargetType],5000)||TargetType<-TargetTypeList],
-					    rpc:call(PodNode,rd,trade_resources,[],5000),
-					    timer:sleep(2000),
-					    ok
-				    end
+				    {ok,TargetTypeList}=db_appl_spec:read(target_type,ApplSpec),
+				    [rpc:call(PodNode,rd,add_target_resource_type,[TargetType],5000)||TargetType<-TargetTypeList],
+				    rpc:call(PodNode,rd,trade_resources,[],5000),
+				    timer:sleep(2000),
+				    ok
 			    end
 		    end
 	    end,

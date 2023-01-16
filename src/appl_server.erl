@@ -212,7 +212,7 @@ handle_call({desired_nodes},_From, State) ->
 	  end,
     {reply, Reply, State};
 
-handle_call({active_nodes},_From, State) ->
+handle_call({active_appls},_From, State) ->
     Reply=case State#state.cluster_spec of
 	      undefined->
 		  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: Not initiated : ",undefined]]),
@@ -233,7 +233,7 @@ handle_call({active_nodes},_From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 
-handle_call({stopped_nodes},_From, State) ->
+handle_call({stopped_appls},_From, State) ->
     Reply=case State#state.cluster_spec of
 	      undefined->
 		  rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: Not initiated : ",undefined]]),
@@ -254,8 +254,8 @@ handle_call({stopped_nodes},_From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 
-handle_call({create_pod,ParentNode,NodeName,Dir,PaArgs,EnvArgs},_From, State) ->
-    Reply=lib_pod:create_node(ParentNode,NodeName,Dir,PaArgs,EnvArgs),
+handle_call({create_appl,ApplSpec,PodNode},_From, State) ->
+    Reply=lib_appl:create_appl(ApplSpec,PodNode),
     {reply, Reply, State};
     
 
