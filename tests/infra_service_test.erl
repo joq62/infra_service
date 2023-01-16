@@ -9,7 +9,7 @@
 %%% Pod consits beams from all services, app and app and sup erl.
 %%% The setup of envs is
 %%% -------------------------------------------------------------------
--module(console_test).      
+-module(infra_service_test).      
  
 -export([start/1]).
 %% --------------------------------------------------------------------
@@ -25,19 +25,27 @@ start([ClusterSpec,_Arg2])->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
     ok=setup(),
-    ok=initiate_test(ClusterSpec),
+    ok=initiate_local_dbase(ClusterSpec),
+    {ok,ParentNode}=start_first_parent(),
 %    ok=desired_test(),
- %   ok=check_appl_status(),
-  %  ok=secure_parents_pods_started(),
-  %  ok=install_appls(),
-    ok=orchistrate(),
+%    ok=check_appl_status(),
+ %   ok=secure_parents_pods_started(),
+ %   ok=install_appls(),
+ %   ok=orchistrate(),
  %   ok=create_initial_node(),
     
         
-  
-   %ok=create_connect(ClusterSpec,StartHostSpec),
-%    ok=init_test(ClusterSpec,StartHostSpec),
-        
+  % Creat parent 
+
+    % Create pod
+
+    % load common, resources_discovery 
+    
+    % load and intiated nodelog
+
+    % load and intitate db_etcd
+    
+    % load and intitae infra
   
     io:format("Stop OK !!! ~p~n",[{?MODULE,?FUNCTION_NAME}]),
   %  init:stop(),
@@ -49,23 +57,12 @@ start([ClusterSpec,_Arg2])->
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-create_initial_node()->
+start_first_parent()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-
     
-    % Creat parent 
-
-    % Create pod
-
-    % load common, resources_discovery 
-    
-    % load and intiated nodelog
-
-    % load and intitate db_etcd
-    
-    % load and intitae infra
-
-    ok.
+    [ParentInfo|_]=db_parent_desired_state:read_all(),
+ %   ok=parent_server:create_node(Parent),
+    {ok,glurk}.
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
@@ -99,16 +96,8 @@ orchistrate()->
 					   common==App],
     [{error,Reason}||{error,Reason}<-create_appl(StoppedCommon,[])],
     StoppedResourceDiscovery=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-						      resource_discovery==App],  
+					   resource_discovery==App],
     [{error,Reason}||{error,Reason}<-create_appl(StoppedResourceDiscovery,[])],
-    StoppedNodelog=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-					    nodelog==App],
-    [{error,Reason}||{error,Reason}<-create_appl(StoppedNodelog,[])],
-    StoppedDbEtcd=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-					   db_etcd==App],
-    [{error,Reason}||{error,Reason}<-create_appl(StoppedDbEtcd,[])],
-
-    %% Applications
     StoppedUserApplications=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
 						     common/=App,
 						     resource_discovery/=App,
@@ -145,11 +134,7 @@ install_appls()->
     []=[{error,Reason}||{error,Reason}<-create_appl(StoppedResourceDiscovery,[])],
 
     % Load and Start nodelog  
-    StoppedNodelog=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-						      nodelog==App],
-    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedNodelog,[])],
     % Load and Start db_etcd 
-
     % Load and star infra_service
 
     % Load and start applications
@@ -330,7 +315,7 @@ desired_test()->
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-initiate_test(ClusterSpec)->
+initiate_local_dbase(ClusterSpec)->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
     {error,["Not yet initiated with a cluster spec :"]}=console_server:load_desired_state(parents),
     {error,["Not yet initiated with a cluster spec :"]}=console_server:load_desired_state(pods),
