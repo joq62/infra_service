@@ -25,8 +25,12 @@ start([ClusterSpec,_Arg2])->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
     ok=setup(),
+    ok=start_local_appls(ClusterSpec),
     ok=initiate_local_dbase(ClusterSpec),
-    {ok,ParentNode}=start_first_parent(),
+    ok=ensure_right_cookie(ClusterSpec),
+    ok=start_parents_pods(),
+    ok=start_infra_appls(),
+    
 %    ok=desired_test(),
 %    ok=check_appl_status(),
  %   ok=secure_parents_pods_started(),
@@ -52,17 +56,153 @@ start([ClusterSpec,_Arg2])->
   %  timer:sleep(2000),
     ok.
 
+
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-start_first_parent()->
+ensure_right_cookie(ClusterSpec)->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+    {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
+    erlang:set_cookie(node(),list_to_atom(Cookie)),
     
-    [ParentInfo|_]=db_parent_desired_state:read_all(),
- %   ok=parent_server:create_node(Parent),
-    {ok,glurk}.
+    ok.
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+start_local_appls(ClusterSpec)->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+
+    {ok,_}=common_server:start(),
+    pong=common_server:ping(),
+    {ok,_}=resource_discovery_server:start(),
+    pong=rd:ping(),
+    ok=application:start(db_etcd),
+    pong=db_etcd:ping(),
+
+    %--
+    ok=db_etcd:config(),
+    %--
+    {ok,_}=parent_server:start(),
+    pong=parent_server:ping(),
+    %--
+    {ok,_}=pod_server:start(),
+    pong=pod_server:ping(),
+    %--
+    {ok,_}=appl_server:start(),
+    pong=appl_server:ping(),
+
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+initiate_local_dbase(ClusterSpec)->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+    ok=parent_server:load_desired_state(ClusterSpec),
+    ok=pod_server:load_desired_state(ClusterSpec),
+    ok=appl_server:load_desired_state(ClusterSpec),	
+    {error,["Already initiated : ","c200_c201"]}=appl_server:load_desired_state(glurk),
+    {error,["Already initiated : ","c200_c201"]}=parent_server:load_desired_state(ClusterSpec),
+  
+    
+    ok.
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+-define(LogDir,"log_dir").
+-define(LogFileName,"file.logs").
+
+start_infra_appls()->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+
+    {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),    
+    StoppedNodelog=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+					    nodelog==App],
+    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedNodelog,[])],
+    
+    StoppedDbEtcd=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+					   db_etcd==App],
+    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedDbEtcd,[])],
+
+    StoppedInfraService=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+					   infra_service==App],
+    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedInfraService,[])],
+    {ok,ActiveApplsInfoList}=appl_server:active_appls(),
+    true=lists:keymember(nodelog,3,ActiveApplsInfoList),
+    true=lists:keymember(db_etcd,3,ActiveApplsInfoList),
+    true=lists:keymember(infra_service,3,ActiveApplsInfoList),
+
+    % config db_etcd
+    [{DbEtcdNode,DbEtcdApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoList,
+					  db_etcd==App],
+    ok=rpc:call(DbEtcdNode,DbEtcdApp,config,[],5000),
+    
+     % config nodelog
+    [{NodelogNode,NodelogApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoList,
+					    nodelog==App],
+  
+    {ok,PodDir}=db_pod_desired_state:read(pod_dir,NodelogNode),
+    PathLogDir=filename:join(PodDir,?LogDir),
+    rpc:call(NodelogNode,file,del_dir_r,[PathLogDir],5000),
+    ok=rpc:call(NodelogNode,file,make_dir,[PathLogDir],5000),
+    PathLogFile=filename:join([PathLogDir,?LogFileName]),
+    ok=rpc:call(NodelogNode,nodelog,config,[PathLogFile],5000),
+  
+
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+start_parents_pods()->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+
+    % just for testing 
+    [rpc:call(Pod,init,stop,[],5000)||Pod<-db_parent_desired_state:get_all_id()],
+    timer:sleep(2000),
+    [rpc:call(Pod,init,stop,[],5000)||Pod<-db_pod_desired_state:get_all_id()],
+    timer:sleep(1000),
+    
+    % Code to be used 
+    
+    {ok,StoppedParents}=parent_server:stopped_nodes(),
+    [parent_server:create_node(Parent)||Parent<-StoppedParents],
+    {ok,ActiveParents}=parent_server:active_nodes(),
+    [{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
+								   Pod2<-ActiveParents,
+								   Pod1/=Pod2],
+						
+    {ok,StoppedPods}=pod_server:stopped_nodes(),
+    [create_pod(Pod)||Pod<-StoppedPods],
+    [rpc:call(Pod1,net_adm,ping,[Pod2],5000)||Pod1<-ActiveParents,
+					      Pod2<-StoppedPods,
+					      Pod1/=Pod2],
+
+    {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),
+    StoppedCommon=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+					   common==App],
+    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedCommon,[])],
+    StoppedResourceDiscovery=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+						      resource_discovery==App],
+    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedResourceDiscovery,[])],
+    % Check if all started 
+    {ok,[]}=parent_server:stopped_nodes(),
+    {ok,[]}=pod_server:stopped_nodes(),
+    ok.
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
@@ -310,27 +450,6 @@ desired_test()->
 
     ok.
 
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-initiate_local_dbase(ClusterSpec)->
-    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-    {error,["Not yet initiated with a cluster spec :"]}=console_server:load_desired_state(parents),
-    {error,["Not yet initiated with a cluster spec :"]}=console_server:load_desired_state(pods),
-    {error,["Not yet initiated with a cluster spec :"]}=console_server:load_desired_state(appls),
-    {error,["Not yet initiated with a cluster spec :"]}=console_server:load_desired_state(glurk),
-    
-    ok=console_server:initiate(ClusterSpec),
-    {errror,["Already intitaited : ",ClusterSpec]}=console_server:initiate(ClusterSpec),
-    ok=console_server:load_desired_state(parents),
-    ok=console_server:load_desired_state(pods),
-    ok=console_server:load_desired_state(appls),
-    {error,["Type not supported ",glurk]}=console_server:load_desired_state(glurk),
-    
-    ok.
-
 
 %% --------------------------------------------------------------------
 %% Function: available_hosts()
@@ -355,7 +474,6 @@ initiate_local_dbase(ClusterSpec)->
 setup()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
-    {ok,_}=console_server:start(),
-    pong=console_server:ping(),
+   
     
     ok.

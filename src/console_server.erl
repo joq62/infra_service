@@ -86,7 +86,7 @@ init([]) ->
     pong=db_etcd:ping(),
 
     %--
-    ok=db_etcd:install(),
+    ok=db_etcd:config(),
     %--
     {ok,_}=parent_server:start(),
     pong=parent_server:ping(),
