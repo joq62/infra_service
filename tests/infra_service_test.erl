@@ -29,7 +29,7 @@ start([ClusterSpec,_Arg2])->
     ok=initiate_local_dbase(ClusterSpec),
     ok=ensure_right_cookie(ClusterSpec),
     ok=start_parents_pods(),
-    ok=start_infra_appls(),
+    ok=start_infra_appls(ClusterSpec),
     
 %    ok=desired_test(),
 %    ok=check_appl_status(),
@@ -124,7 +124,7 @@ initiate_local_dbase(ClusterSpec)->
 -define(LogDir,"log_dir").
 -define(LogFileName,"file.logs").
 
-start_infra_appls()->
+start_infra_appls(ClusterSpec)->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
     {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),    
@@ -163,6 +163,14 @@ start_infra_appls()->
     PathLogFile=filename:join([PathLogDir,?LogFileName]),
     ok=rpc:call(NodelogNode,nodelog,config,[PathLogFile],5000),
     true=rpc:call(NodelogNode,nodelog,is_config,[],5000),
+
+    [{InfraServiceNode,InfraServiceApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoList,
+					  infra_service==App],
+
+    
+    false=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[ClusterSpec],5000),
+    ok=rpc:call(InfraServiceNode,InfraServiceApp,config,[],5000),
+    true=rpc:call(DbEtcdNode,DbEtcdApp,is_config,[],5000),
   
 
     ok.
