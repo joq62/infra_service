@@ -168,16 +168,9 @@ start_infra_appls(ClusterSpec)->
 					  infra_service==App],
 
     
-    R1=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
-    io:format("R1 ~p~n",[{R1,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
-    R2=rpc:call(InfraServiceNode,InfraServiceApp,config,[ClusterSpec],5000),
-    io:format("R2 ~p~n",[{R2,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
-    R3=rpc:call(DbEtcdNode,DbEtcdApp,is_config,[],5000),
-    io:format("R3 ~p~n",[{R3,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
-    
- %   false= rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
-  %  ok=rpc:call(InfraServiceNode,InfraServiceApp,config,[ClusterSpec],5000),
-  %  true=rpc:call(DbEtcdNode,DbEtcdApp,is_config,[],5000),
+    false=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
+    ok=rpc:call(InfraServiceNode,InfraServiceApp,config,[ClusterSpec],5000),
+    true=rpc:call(DbEtcdNode,DbEtcdApp,is_config,[],5000),
   
 
     ok.
