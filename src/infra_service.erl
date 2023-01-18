@@ -12,6 +12,7 @@
 %% --------------------------------------------------------------------
 -export([
 	 is_config/0,
+	 config/1,
 	 orchistrate_result/3,
 	 ping/0
 
@@ -34,6 +35,8 @@ ping() ->
 
 is_config()->
     gen_server:call(?SERVER, {is_config}).
+config(ClusterSpec)->
+    gen_server:call(?SERVER, {config,ClusterSpec}).
     
 
 orchistrate_result(ResultStartParentPods,ResultStartInfraAppls,ResultStartUserAppls)->
