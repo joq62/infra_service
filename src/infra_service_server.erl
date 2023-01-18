@@ -40,7 +40,7 @@
 
 %%-------------------------------------------------------------------
 -record(state,{
-	       
+	       cluster_spec	       
 	      }).
 
 
@@ -69,53 +69,8 @@ ping() ->
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
 init([]) -> 
-    ClusterSpec=db_config:get(cluster_spec),
-
-    LogDir="log_dir",
-    LogFile="logs1.logs",
- %   LogDirPath=filename:join(ClusterDir,LogDir),
-
-  %  case filelib:is_dir(LogDirPath) of
-    case filelib:is_dir(LogDir) of
-	true->
-	    ok;
-	false->
-	    ok=file:make_dir(LogDir),
-	    LogFilePath=filename:join(LogDir,LogFile),
-	    ok=nodelog:create(LogFilePath)
-    end,
-       
-    % set right cookie based on the ClusterSpec
-
-    {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
-    erlang:set_cookie(node(),list_to_atom(Cookie)),
-
-    
-    % Trade resources
-    [rd:add_local_resource(Type,node())||Type<-?LocalTypes],
-    [rd:add_target_resource_type(Type)||Type<-?TargetTypes],
-    ok=rd:trade_resources(),
-    timer:sleep(3000),
-
-    %% create cluster
-    {ok,_}=connect_server:create_dbase_info(ClusterSpec),    
-    connect_server:create_connect_nodes(ClusterSpec),
-    connect_server:start_monitoring(ClusterSpec),
-    % Controller and Workers
-    {PresentControllers,MissingControllers}=pod_server:create_controller_pods(ClusterSpec),
-    {PresentWorkers,MissingWorkers}=pod_server:create_worker_pods(ClusterSpec),
- %   io:format("PresentControllers,MissingControllers ~p~n",[{PresentControllers,MissingControllers,?MODULE,?FUNCTION_NAME}]),
-  %  io:format("PresentWorkers,MissingWorkers ~p~n",[{PresentWorkers,MissingWorkers,?MODULE,?FUNCTION_NAME}]),
-    pod_server:start_monitoring(ClusterSpec),
-  
-    % Deploy appls
-    appl_server:deploy_appls(ClusterSpec),
-    appl_server:start_monitoring(ClusterSpec),
-    
- %   io:format("Started Server ~p~n",[{?MODULE,?LINE}]), 
-    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,"Servere started"]),
-
-    {ok, #state{}}.   
+     rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,"Servere started"]),
+    {ok, #state{cluster_spec=undefined}}.   
  
 
 %% --------------------------------------------------------------------
@@ -128,7 +83,31 @@ init([]) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
+handle_call({is_config},_From, State) ->
+    Reply=case State#state.cluster_spec of 
+	      undefined->
+		  false;
+	      _->
+		  true
+	  end,	  		      
+    {reply, Reply, State};
 
+handle_call({config,ClusterSpec},_From, State) ->
+    Reply=case State#state.cluster_spec of 
+	      undefined->
+		  case rpc:cast(node(),lib_infra_service,orchistrate,[]) of
+		      {badrpc,Reason}->
+			  NewState=State,
+			  {error,["Error when calling orchistrate :",Reason,?MODULE,?LINE]};
+		      ok->
+			  NewState=State#state{cluster_spec=ClusterSpec},
+			  ok
+		  end;
+	      _->
+		  NewState=State,
+		  {error,["Error  Already configured:",ClusterSpec,?MODULE,?LINE]}
+	  end,	  		      
+    {reply, Reply, NewState};
 
 handle_call({ping},_From, State) ->
     Reply=pong,
@@ -146,6 +125,22 @@ handle_call(Request, From, State) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
 
+handle_cast({orchistrate_result,_ResultStartParentPods,
+	     _ResultStartInfraAppls,_ResultStartUserAppls}, State) ->
+    {ok,StoppedParents}=parent_server:stopped_nodes(),
+    {ok,StoppedPods}=pod_server:stopped_nodes(),
+    {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),
+
+    case {StoppedParents,StoppedPods,StoppedApplInfoLists} of
+	{[],[],[]}->
+	    ok;
+	_->
+	    io:format("StoppedParents ~p~n",[{StoppedParents,?MODULE,?LINE}]),
+	    io:format("StoppedPods ~p~n",[{StoppedPods,?MODULE,?LINE}]),
+	    io:format("StoppedApplInfoLists ~p~n",[{StoppedApplInfoLists,?MODULE,?LINE}])
+    end,
+    rpc:cast(node(),lib_infra_service,orchistrate,[]),
+    {noreply, State};
 
 handle_cast(Msg, State) ->
     io:format("unmatched match cast ~p~n",[{Msg,?MODULE,?LINE}]),

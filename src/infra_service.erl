@@ -31,6 +31,10 @@
 ping() ->
     gen_server:call(?SERVER, {ping}).
 
+orchistrate_result(ResultStartParentPods,ResultStartInfraAppls,ResultStartUserAppls)->
+    gen_server:cast(?SERVER,{orchistrate_result,ResultStartParentPods,
+		    ResultStartInfraAppls,ResultStartUserAppls}).    
+
 
 %% ====================================================================!
 %% External functions

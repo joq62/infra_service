@@ -8,7 +8,7 @@
               {modules,[appl,appl_server,console_server,controller_server,
                         infra_service,infra_service_app,infra_service_server,
                         infra_service_sup,lib_appl,lib_console,lib_controller,
-                        lib_parent,lib_pod,oam,oam_server,ops_ssh,ops_vm,
-                        parent_server,pod_server]},
+                        lib_infra_service,lib_parent,lib_pod,oam,oam_server,
+                        ops_ssh,ops_vm,parent_server,pod_server]},
               {licenses,["Apache-2.0"]},
               {links,[]}]}.
