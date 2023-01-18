@@ -99,7 +99,7 @@ handle_call({config,ClusterSpec},_From, State) ->
 		      {badrpc,Reason}->
 			  NewState=State,
 			  {error,["Error when calling orchistrate :",Reason,?MODULE,?LINE]};
-		      ok->
+		      true->
 			  NewState=State#state{cluster_spec=ClusterSpec},
 			  ok
 		  end;
