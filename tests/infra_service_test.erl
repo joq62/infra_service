@@ -168,8 +168,8 @@ start_infra_appls(ClusterSpec)->
 					  infra_service==App],
 
     
-    false=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[ClusterSpec],5000),
-    ok=rpc:call(InfraServiceNode,InfraServiceApp,config,[],5000),
+    false=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
+    ok=rpc:call(InfraServiceNode,InfraServiceApp,config,[ClusterSpec],5000),
     true=rpc:call(DbEtcdNode,DbEtcdApp,is_config,[],5000),
   
 
