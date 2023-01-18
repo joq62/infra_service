@@ -147,18 +147,22 @@ start_infra_appls()->
     % config db_etcd
     [{DbEtcdNode,DbEtcdApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoList,
 					  db_etcd==App],
+
+    false=rpc:call(DbEtcdNode,DbEtcdApp,is_config,[],5000),
     ok=rpc:call(DbEtcdNode,DbEtcdApp,config,[],5000),
-    
-     % config nodelog
+    false=rpc:call(DbEtcdNode,DbEtcdApp,is_config,[],5000),
+
     [{NodelogNode,NodelogApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoList,
 					    nodelog==App],
   
+    false=rpc:call(NodelogNode,nodelog,is_config,[],5000),
     {ok,PodDir}=db_pod_desired_state:read(pod_dir,NodelogNode),
     PathLogDir=filename:join(PodDir,?LogDir),
     rpc:call(NodelogNode,file,del_dir_r,[PathLogDir],5000),
     ok=rpc:call(NodelogNode,file,make_dir,[PathLogDir],5000),
     PathLogFile=filename:join([PathLogDir,?LogFileName]),
     ok=rpc:call(NodelogNode,nodelog,config,[PathLogFile],5000),
+    true=rpc:call(NodelogNode,nodelog,is_config,[],5000),
   
 
     ok.
