@@ -220,6 +220,7 @@ handle_call({stopped_nodes},_From, State) ->
 
 handle_call({create_pod,ParentNode,NodeName,Dir,PaArgs,EnvArgs},_From, State) ->
     Reply=lib_pod:create_node(ParentNode,NodeName,Dir,PaArgs,EnvArgs),
+    io:format("Reply, ParentNode,NodeName,Dir,PaArgs,EnvArgs ~p~n",[{Reply,ParentNode,NodeName,Dir,PaArgs,EnvArgs,?MODULE,?LINE}]),
     {reply, Reply, State};
     
 %%--------------------------------------------------------------------

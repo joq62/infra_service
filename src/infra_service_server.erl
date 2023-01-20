@@ -14,22 +14,10 @@
 %% --------------------------------------------------------------------
 %% Include files
 %% --------------------------------------------------------------------
--define(LocalTypes,[infra_service,oam,nodelog]).
--define(TargetTypes,[infra_service,oam,nodelog]).
+-define(LocalTypes,[infra_service]).
+-define(TargetTypes,[nodelog]).
 
 %% --------------------------------------------------------------------
-
-%% External exports
--export([
-	
-	 ping/0
-	]).
-
-
--export([
-	 start/0,
-	 stop/0
-	]).
 
 
 %% gen_server callbacks
@@ -48,13 +36,7 @@
 %% External functions
 %% ====================================================================
 
-	    
-%% call
-start()-> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-stop()-> gen_server:call(?MODULE, {stop},infinity).
-
-ping() ->
-    gen_server:call(?MODULE, {ping}).
+       
 
 %% ====================================================================
 %% Server functions
@@ -69,7 +51,7 @@ ping() ->
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
 init([]) -> 
-     rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,"Servere started"]),
+     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,"Servere started"]),
     {ok, #state{cluster_spec=undefined}}.   
  
 
@@ -98,13 +80,15 @@ handle_call({config,ClusterSpec},_From, State) ->
 		  case rpc:cast(node(),lib_infra_service,orchistrate,[]) of
 		      {badrpc,Reason}->
 			  NewState=State,
+			  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error when calling orchistrate  : ",Reason,?MODULE,?LINE]]),
 			  {error,["Error when calling orchistrate :",Reason,?MODULE,?LINE]};
 		      true->
 			  NewState=State#state{cluster_spec=ClusterSpec},
 			  ok
 		  end;
-	      _->
+	      AlreadyConfig->
 		  NewState=State,
+		  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,[" Already configured  : ",AlreadyConfig,ClusterSpec,?MODULE,?LINE]]),
 		  {error,["Error  Already configured:",ClusterSpec,?MODULE,?LINE]}
 	  end,	  		      
     {reply, Reply, NewState};

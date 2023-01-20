@@ -256,6 +256,8 @@ handle_call({stopped_appls},_From, State) ->
 
 handle_call({create_appl,ApplSpec,PodNode},_From, State) ->
     Reply=lib_appl:create_appl(ApplSpec,PodNode),
+    io:format("Reply, ApplSpec,PodNode ~p~n",[{Reply,ApplSpec,PodNode,?MODULE,?LINE}]),
+ 
     {reply, Reply, State};
     
 

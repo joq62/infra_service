@@ -125,6 +125,11 @@ start_infra_appls(ClusterSpec)->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
     {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),    
+    StoppedPod=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+					    pod==App],
+    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedPod,[])],
+
+
     StoppedNodelog=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
 					    nodelog==App],
     []=[{error,Reason}||{error,Reason}<-create_appl(StoppedNodelog,[])],
