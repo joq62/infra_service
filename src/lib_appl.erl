@@ -37,7 +37,7 @@
 %%--------------------------------------------------------------------
 desired_appls()->
     
-    Result=case db_appl_desired_state:get_all_id() of
+    Result=case sd:call(db_etcd,db_appl_desired_state,get_all_id,[],5000) of
 	       {error,Reason}->
 		   {error,Reason};
 	       []->
@@ -53,7 +53,7 @@ desired_appls()->
 %% @end
 %%--------------------------------------------------------------------
 active_appls()->
-    A1=[{PodNode,db_pod_desired_state:read(appl_spec_list,PodNode)}||PodNode<-db_pod_desired_state:get_all_id()],
+    A1=[{PodNode,sd:call(db_etcd,db_pod_desired_state,read,[appl_spec_list,PodNode],5000)}||PodNode<-sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000)],
     A2=[{PodNode,ApplList}||{PodNode,{ok,ApplList}}<-A1],
     PodApplSpecAppList=lists:append([pod_app_list(PodApplSpecList,[])||PodApplSpecList<-A2]),
     {ok,StoppedAppls}=stopped_appls(),
@@ -66,7 +66,7 @@ active_appls()->
 %% @end
 %%--------------------------------------------------------------------
 stopped_appls()->
-    A1=[{PodNode,db_pod_desired_state:read(appl_spec_list,PodNode)}||PodNode<-db_pod_desired_state:get_all_id()],
+    A1=[{PodNode,sd:call(db_etcd,db_pod_desired_state,read,[appl_spec_list,PodNode],5000)}||PodNode<-sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000)],
     A2=[{PodNode,ApplList}||{PodNode,{ok,ApplList}}<-A1],
     PodApplSpecAppList=lists:append([pod_app_list(PodApplSpecList,[])||PodApplSpecList<-A2]),
     
@@ -90,7 +90,7 @@ is_app_running(App,PodNode)->
 pod_app_list({_PodNode,[]},Acc)->
     Acc;
 pod_app_list({PodNode,[ApplSpec|T]},Acc)->
-   {ok,App}=db_appl_spec:read(app,ApplSpec),
+   {ok,App}=sd:call(db_etcd,db_appl_spec,read,[app,ApplSpec],5000),
     NewAcc=[{PodNode,ApplSpec,App}|Acc],
     pod_app_list({PodNode,T},NewAcc).
 %%--------------------------------------------------------------------
@@ -103,12 +103,12 @@ create_appl(ApplSpec,PodNode)->
     create_appl(ApplSpec,PodNode,?TimeOut).
 
 create_appl(ApplSpec,PodNode,TimeOut)->
-    {ok,PodDir}=db_pod_desired_state:read(pod_dir,PodNode),
+    {ok,PodDir}=sd:call(db_etcd,db_pod_desired_state,read,[pod_dir,PodNode],5000),
     ApplDir=filename:join(PodDir,ApplSpec),
     rpc:call(PodNode,file,del_dir_r,[ApplDir],5000),
     Result=case rpc:call(PodNode,file,make_dir,[ApplDir],5000) of
 	       {badrpc,Reason}->
-		   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
+		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
 		   {error,["Error during do_start : ",badrpc,Reason,ApplSpec,PodNode,?MODULE,?FUNCTION_NAME,?LINE]};
 	       ok->
 		   {ok,HostSpec}=db_pod_desired_state:read(host_spec,PodNode),
@@ -117,7 +117,7 @@ create_appl(ApplSpec,PodNode,TimeOut)->
 		   {ok,PodApplGitPath}=db_appl_spec:read(gitpath,ApplSpec),
 		   case do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut) of
 		       {error,Reason}->
-			   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
+			   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
 			   {error,["Error during do_start : ",Reason,ApplSpec,PodNode,?MODULE,?FUNCTION_NAME,?LINE]};
 		       ok->
 			   {ok,LocalTypeList}=db_appl_spec:read(local_type,ApplSpec),
@@ -127,7 +127,7 @@ create_appl(ApplSpec,PodNode,TimeOut)->
 			   [rpc:call(PodNode,rd,add_target_resource_type,[TargetType],5000)||TargetType<-TargetTypeList],
 			   rpc:call(PodNode,rd,trade_resources,[],5000),
 			   timer:sleep(2000),
-			   rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["application created ",ApplSpec,PodNode]]),
+			   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["application created ",ApplSpec,PodNode]]),
 			   ok
 		   end
 	   end,
@@ -140,7 +140,7 @@ create_appl(ApplSpec,PodNode,TimeOut)->
 do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut)->
     Result= case appl:git_clone_to_dir(PodNode,PodApplGitPath,ApplDir) of
 		{error,Reason}->
-		    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
+		    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
 		    {error,["Error when cloning : ", Reason,PodNode,PodApplGitPath,ApplDir,?MODULE,?FUNCTION_NAME,?LINE]};
 		{ok,_}->
 		    {ok,PodApp}=db_appl_spec:read(app,ApplSpec),
@@ -148,12 +148,12 @@ do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut)->
 		    Paths=[ApplEbin],
 		    case appl:load(PodNode,PodApp,Paths) of
 			{error,Reason}->
-			    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
+			    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
 			    {error,["Error when loading application : ",Reason,PodNode,PodApp,Paths,?MODULE,?FUNCTION_NAME,?LINE]}; 
 			ok->
 			    case appl:start(PodNode,PodApp,TimeOut) of
 				{error,Reason}->
-				    rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
+				    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
 				    {error,Reason};
 				ok->
 				    {ok,LocalTypeList}=db_appl_spec:read(local_type,ApplSpec),
@@ -179,19 +179,19 @@ do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut)->
 %% @end
 %%--------------------------------------------------------------------
 get_candidate_pods(SpecId,HostSpec,ClusterSpec)->
-    {ok,ApplSpec}=db_appl_deployment:read(appl_spec,SpecId),
-    RightHost=[PodNode||PodNode<-db_pod_desired_state:get_all_id(),
-			{ok,HostSpec}==db_pod_desired_state:read(host_spec,PodNode)],
-    NodeApplSpecList=[{PodNode,db_pod_desired_state:read(appl_spec_list,PodNode)}||PodNode<-RightHost],
+    {ok,ApplSpec}=sd:call(db_etcd,db_appl_deployment,read,[appl_spec,SpecId],5000),
+    RightHost=[PodNode||PodNode<-sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000),
+			{ok,HostSpec}==sd:call(db_etcd,db_pod_desired_state,read,[host_spec,PodNode],5000)],
+    NodeApplSpecList=[{PodNode,sd:call(db_etcd,db_pod_desired_state,read,[appl_spec_list,PodNode],5000)}||PodNode<-RightHost],
     Candidates=[PodNode||{PodNode,{ok,ApplSpecList}}<-NodeApplSpecList,
 			 false==lists:member(ApplSpec,ApplSpecList),
-			 {ok,ClusterSpec}==db_pod_desired_state:read(cluster_spec,PodNode)],
+			 {ok,ClusterSpec}==sd:call(db_etcd,db_pod_desired_state,read,[cluster_spec,PodNode],5000)],
     prioritize(Candidates,[]).
 
 prioritize([],Acc)->
     [PodNode||{_NumApplSpecs,PodNode}<-lists:keysort(1,Acc)];
 prioritize([PodNode|T],Acc) ->
-    {ok,ApplSpecList}=db_pod_desired_state:read(appl_spec_list,PodNode),
+    {ok,ApplSpecList}=sd:call(db_etcd,db_pod_desired_state,read,[appl_spec_list,PodNode],5000),
     NumApplSpecs=list_length:start(ApplSpecList),
     prioritize(T,[{NumApplSpecs,PodNode}|Acc]).
  
@@ -201,12 +201,12 @@ prioritize([PodNode|T],Acc) ->
 %% @end
 %%--------------------------------------------------------------------
 load_desired_state(ClusterSpec)->
-    {ok,PodsHostList}=db_cluster_spec:read(pods,ClusterSpec),
+    {ok,PodsHostList}=sd:call(db_etcd,db_cluster_spec,read,[pods,ClusterSpec],5000),
   %  io:format("PodsHostList ~p~n",[{PodsHostList,?MODULE,?FUNCTION_NAME,?LINE}]),
     HostSpecList=[HostSpec||{_Num,HostSpec}<-PodsHostList],
-    AllDeploymentId=db_appl_deployment:get_all_id(),
-    ApplDeploymentSpecInfoList=[db_appl_deployment:read(ApplDeploymentId)||ApplDeploymentId<-AllDeploymentId,
-			       {ok,ClusterSpec}==db_appl_deployment:read(cluster_spec,ApplDeploymentId)],
+    AllDeploymentId=sd:call(db_etcd,db_appl_deployment,get_all_id,[],5000),
+    ApplDeploymentSpecInfoList=[sd:call(db_etcd,db_appl_deployment,read,[ApplDeploymentId],5000)||ApplDeploymentId<-AllDeploymentId,
+			       {ok,ClusterSpec}==sd:call(db_etcd,db_appl_deployment,read,[cluster_spec,ApplDeploymentId],5000)],
     _Result=main_load_desired_state(ApplDeploymentSpecInfoList,HostSpecList,[]),
  %   io:format("Result ~p~n",[{Result,?MODULE,?FUNCTION_NAME,?LINE}]).
     ok.
@@ -221,12 +221,12 @@ main_load_desired_state([ApplDeploymentSpec|T],HostSpecList,Acc) ->
 load_desired_state({_SpecId,_ApplSpec,_Vsn,_ClusterSpec,_,each_pod},[],Acc)->
     Acc;
 load_desired_state({SpecId,ApplSpec,_Vsn,ClusterSpec,1,each_pod},[HostSpec|T],Acc)->
-    RightHost=[PodNode||PodNode<-db_pod_desired_state:get_all_id(),
-			{ok,HostSpec}==db_pod_desired_state:read(host_spec,PodNode)],
-    NodeApplSpecList=[{PodNode,db_pod_desired_state:read(appl_spec_list,PodNode)}||PodNode<-RightHost],
+    RightHost=[PodNode||PodNode<-sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000),
+			{ok,HostSpec}==sd:call(db_etcd,db_pod_desired_state,read,[host_spec,PodNode],5000)],
+    NodeApplSpecList=[{PodNode,sd:call(db_etcd,db_pod_desired_state,read,[appl_spec_list,PodNode],5000)}||PodNode<-RightHost],
     Candidates=[PodNode||{PodNode,{ok,ApplSpecList}}<-NodeApplSpecList,
 			 false==lists:member(ApplSpec,ApplSpecList),
-			 {ok,ClusterSpec}==db_pod_desired_state:read(cluster_spec,PodNode)],
+			 {ok,ClusterSpec}==sd:call(db_etcd,db_pod_desired_state,read,[cluster_spec,PodNode],5000)],
     AddResult=[{db_pod_desired_state:add_appl_list(ApplSpec,PodNode),ApplSpec,PodNode,HostSpec}||PodNode<-Candidates],
     ErrorResult=[{error,["ERROR: Aborted ApplSpec,PodNode,HostSpec : ",Reason,ApplSpec,PodNode,HostSpec]}||
 		    {{aborted,Reason},ApplSpec,PodNode,HostSpec}<-AddResult],
@@ -244,7 +244,7 @@ load_desired_state({SpecId,ApplSpec,_Vsn,ClusterSpec,N,any_host},[HostSpec|T],Ac
 	       []->
 		   {error,["ERROR: No candidates  ",ApplSpec,HostSpec]};
 	       [PodNode|_]->
-		   case db_pod_desired_state:add_appl_list(ApplSpec,PodNode) of
+		   case sd:call(db_etcd,db_pod_desired_state,add_appl_list,[ApplSpec,PodNode],5000) of
 		       {aborted,Reason}->
 			   {error,["ERROR: Aborted ApplSpec,PodNode,HostSpec : ",Reason,ApplSpec,PodNode,HostSpec]};
 		       {atomic,ok}->
@@ -267,7 +267,7 @@ load_desired_state({SpecId,ApplSpec,_Vsn,ClusterSpec,N,[HostSpec|T]},HostList,Ac
 		       []->
 			   {error,["ERROR: No candidates  ",ApplSpec,HostSpec]};
 		       [PodNode|_]->				   
-			   case db_pod_desired_state:add_appl_list(ApplSpec,PodNode) of
+			   case sd:call(db_etcd,db_pod_desired_state,add_appl_list,[ApplSpec,PodNode],5000) of
 			       {aborted,Reason}->
 				   {error,["ERROR: Aborted ApplSpec,PodNode,HostSpec : ",Reason,ApplSpec,PodNode,HostSpec]};
 			       {atomic,ok}->

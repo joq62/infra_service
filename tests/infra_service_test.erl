@@ -78,10 +78,7 @@ ensure_right_cookie(ClusterSpec)->
 start_local_appls(ClusterSpec)->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
-    {ok,_}=common_server:start(),
-    pong=common_server:ping(),
-    {ok,_}=resource_discovery_server:start(),
-    pong=rd:ping(),
+    ok=application:start(pod),
     ok=application:start(db_etcd),
     pong=db_etcd:ping(),
 

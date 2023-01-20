@@ -6,7 +6,7 @@ all:
 	rm -rf *.dir;
 	rm -f rebar.lock;
 	rm -rf common;
-	rm -rf resource_discovery;
+	rm -rf sd;
 	rm -rf nodelog;
 	rm -rf db_etcd;
 #	tests 
@@ -43,7 +43,7 @@ clean:
 	rm -rf Mnesia.*;
 	rm -rf *.dir;
 	rm -rf common;
-	rm -rf resource_discovery;
+	rm -rf sd;
 	rm -rf nodelog;
 	rm -rf db_etcd;
 
@@ -59,10 +59,8 @@ eunit:
 	mkdir tests_ebin;
 	erlc -I include -o tests_ebin tests/*.erl;
 #  	dependencies
-	rm -rf common;
-	git clone https://github.com/joq62/common.git;
-	rm -rf resource_discovery;
-	git clone https://github.com/joq62/resource_discovery.git;
+	rm -rf pod;
+	git clone https://github.com/joq62/pod.git;
 	rm -rf nodelog;
 	git clone https://github.com/joq62/nodelog.git;
 	rm -rf db_etcd;

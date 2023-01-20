@@ -36,7 +36,7 @@
 %% @end
 %%--------------------------------------------------------------------
 desired_nodes()->
-    Result=case db_pod_desired_state:get_all_id() of
+    Result=case sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000) of
 	       {error,Reason}->
 		   {error,Reason};
 	       []->
@@ -52,8 +52,8 @@ desired_nodes()->
 %% @end
 %%--------------------------------------------------------------------
 active_nodes()->
-    AllNodes=db_pod_desired_state:get_all_id(),
-    RunningNodesDir=[{Node,db_pod_desired_state:read(pod_dir,Node)}||Node<-AllNodes,
+    AllNodes= sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000),
+    RunningNodesDir=[{Node,sd:call(db_etcd,db_pod_desired_state,read,[pod_dir,Node],5000)}||Node<-AllNodes,
 								pong==net_adm:ping(Node)],
     ActiveNodes=[Node||{Node,{ok,PodDir}}<-RunningNodesDir,
 		       rpc:call(Node,filelib,is_dir,[PodDir],5000)],
@@ -81,27 +81,27 @@ stopped_nodes()->
 create_node(ParentNode,NodeName,PodDir,PaArgsList,EnvArgs)->
     Result=case rpc:call(ParentNode,net,gethostname,[],5000) of
 	       {badrpc,Reason}->
-		   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
+		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
 		   {badrpc,["Error  :",Reason,ParentNode]};
 	       {ok,HostName}->
 		   case rpc:call(ParentNode,erlang,get_cookie,[],5000) of 
 		       {badrpc,Reason}->
-			   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
+			   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
 			   {badrpc,["Error  :",Reason,ParentNode]};	
 		       CookieAtom->
 			    Cookie=atom_to_list(CookieAtom),
 			   Args=" -setcookie "++Cookie++" "++EnvArgs,
 			   case rpc:call(ParentNode,slave,start,[HostName,NodeName,Args],5000) of
 			       {badrpc,Reason}->
-				   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
+				   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
 				   {badrpc,Reason};
 			       {error,Reason}->
-				   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
+				   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
 				   {error,Reason};
 			       {ok,SlaveNode}->
 				   case net_kernel:connect_node(SlaveNode) of
 				       false->
-					   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error failed_connect ",SlaveNode]]),
+					   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error failed_connect ",SlaveNode]]),
 					   {error,[failed_connect,SlaveNode]};
 				       ignored->
 					   {error,[ignored,SlaveNode]};
@@ -110,16 +110,16 @@ create_node(ParentNode,NodeName,PodDir,PaArgsList,EnvArgs)->
 					   case rpc:call(SlaveNode,file,make_dir,[PodDir],5000) of
 					       {badrpc,Reason}->
 						   rpc:call(SlaveNode,init,stop,[],1000),
-						   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
+						   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
 						   {badrpc,Reason};
 					       {error,Reason}->
 						   rpc:call(SlaveNode,init,stop,[],1000),
-						   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
+						   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
 						   {error,Reason};
 					       ok->  
 						   []=[{error,Path}||Path<-[PodDir|PaArgsList],
 								     true/=rpc:call(SlaveNode,code,add_patha,[Path],5000)],
-						   rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Pod node succesfully created with Dir  ",SlaveNode,PodDir]]),
+						   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Pod node succesfully created with Dir  ",SlaveNode,PodDir]]),
 						   ok
 					   end
 				   end
