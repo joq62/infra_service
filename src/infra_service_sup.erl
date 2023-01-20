@@ -37,7 +37,7 @@ init([]) ->
 		  #{id=>appl,
 		    start=>{appl_server,start,[]}},
 		  #{id=>infra_service,
-		    start=>{infra_service_server,start,[]}}],
+		    start=>{infra_service,start,[]}}],
     {ok, {SupFlags, ChildSpecs}}.
 
 %% internal functions
