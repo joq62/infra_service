@@ -72,12 +72,10 @@ start_parents_pods()->
 					      Pod2<-StoppedPods,
 					      Pod1/=Pod2],
     {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),
-    StoppedCommon=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-					   common==App],
-    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedCommon,[])],
-    StoppedResourceDiscovery=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-						      resource_discovery==App],
-    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedResourceDiscovery,[])],
+    StoppedPod=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+					   pod==App],
+    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedPod,[])],
+    
   
     ok.
 %%--------------------------------------------------------------------
@@ -135,8 +133,7 @@ start_infra_appls()->
 start_user_appls()->
     {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),
     StoppedUserApplications=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-						     common/=App,
-						     resource_discovery/=App,
+						     pod/=App,
 						     db_etcd/=App,
 						     nodelog/=App,
 						     infra_service/=App],
