@@ -20,9 +20,13 @@
 
 %% External exports
 -export([
+
+	 create_pod/3,
+	 get_pod/2,
+	 get_pod/3,
+	 
 	 create_controller_pods/1, 
 	 create_worker_pods/1,
-	 get_pod/2,
 	 present_controller_nodes/0,
 	 present_worker_nodes/0,
 	 
@@ -66,14 +70,23 @@
 start()-> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 stop()-> gen_server:call(?MODULE, {stop},infinity).
 
+
+create_pod(ClusterSpec,HostSpec,Type)->
+    gen_server:call(?MODULE, {create_pod,ClusterSpec,HostSpec,Type},infinity).
+
+%get_pod(HostSpec,Type)->
+ %     gen_server:call(?MODULE, {get_pod,HostSpec,Type},infinity).
+
+get_pod(ApplSpec,HostSpec)->
+      gen_server:call(?MODULE, {get_pod,ApplSpec,HostSpec},infinity).
+get_pod(ApplSpec,HostSpec,Type)->
+      gen_server:call(?MODULE, {get_pod,ApplSpec,HostSpec,Type},infinity).
+
 create_controller_pods(ClusterSpec)->
     gen_server:call(?MODULE, {create_controller_pods,ClusterSpec},infinity).
 
 create_worker_pods(ClusterSpec)->
     gen_server:call(?MODULE, {create_worker_pods,ClusterSpec},infinity).
-
-get_pod(ApplSpec,HostSpec)->
-      gen_server:call(?MODULE, {get_pod,ApplSpec,HostSpec},infinity).
 
 present_controller_nodes()->
     gen_server:call(?MODULE, {present_controllers},infinity).
@@ -121,6 +134,17 @@ init([]) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
+
+handle_call({create_pod,ClusterSpec,HostSpec,Type},_From, State) ->
+    controller_pods(ClusterSpec),
+    PresentControllerNodes=present_controller_nodes(ClusterSpec),
+    MissingControllerNodes=missing_controller_nodes(ClusterSpec),
+    NewState=State#state{present_controller_nodes=PresentControllerNodes,
+			 missing_controller_nodes=MissingControllerNodes		    
+			},
+    Reply={PresentControllerNodes,MissingControllerNodes},
+    {reply, Reply, NewState};
+
 
 handle_call({create_controller_pods,ClusterSpec},_From, State) ->
     controller_pods(ClusterSpec),
@@ -325,8 +349,18 @@ hbeat(ClusterSpec)->
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
 wanted_state(ClusterSpec)->
-    MissingControllerNodes=missing_controller_nodes(ClusterSpec),
-    MissingWorkerNodes=missing_worker_nodes(ClusterSpec),
+    Controllers=[{Node,db_cluster_instance:read(pod_dir,ClusterSpec,Node)}||Node<-present_controller_nodes(ClusterSpec)],
+    ControllerNoDirs=[Node||{Node,{ok,PodDir}}<-Controllers,
+			    true/=rpc:call(Node,filelib,is_dir,[PodDir],2000)],
+    [rpc:call(Node,init,stop,[],2000)||Node<-ControllerNoDirs],
+    MissingControllerNodes=lists:append(ControllerNoDirs,missing_controller_nodes(ClusterSpec)),  
+    
+    Workers=[{Node,db_cluster_instance:read(pod_dir,ClusterSpec,Node)}||Node<-present_worker_nodes(ClusterSpec)],
+    WorkerNoDirs=[Node||{Node,{ok,PodDir}}<-Workers,
+			    true/=rpc:call(Node,filelib,is_dir,[PodDir],2000)],
+    [rpc:call(Node,init,stop,[],2000)||Node<-WorkerNoDirs],
+    MissingWorkerNodes=lists:append(WorkerNoDirs,missing_worker_nodes(ClusterSpec)),
+
     [restart_pod(ClusterSpec,PodNode)||PodNode<-MissingControllerNodes],
     [restart_pod(ClusterSpec,PodNode)||PodNode<-MissingWorkerNodes],
     ok.
@@ -336,6 +370,7 @@ wanted_state(ClusterSpec)->
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
 missing_controller_nodes(ClusterSpec)->
+   
     [Node||Node<-db_cluster_instance:nodes(controller,ClusterSpec), 
 	   pang=:=net_adm:ping(Node)].
 present_controller_nodes(ClusterSpec)->

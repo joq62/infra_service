@@ -7,20 +7,22 @@
 %%% 
 %%% Created : 10 dec 2012
 %%% -------------------------------------------------------------------
--module(controller_server). 
+-module(controller_server).
  
 -behaviour(gen_server).
 
 %% --------------------------------------------------------------------
 %% Include files
 %% --------------------------------------------------------------------
+-define(LocalTypes,[infra_service,oam,nodelog]).
+-define(TargetTypes,[infra_service,oam,nodelog]).
 
 %% --------------------------------------------------------------------
--define(LocalResources,[{db_etcd,node()},{nodelog,node()}]).
--define(Target,[pod_app,db_etcd,nodelog]).
 
 %% External exports
 -export([
+	
+	 ping/0
 	]).
 
 
@@ -37,9 +39,8 @@
 -export([init/1, handle_call/3,handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 %%-------------------------------------------------------------------
-
--record(state,{cluster_spec
-	     	      
+-record(state,{
+	       
 	      }).
 
 
@@ -52,9 +53,8 @@
 start()-> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 stop()-> gen_server:call(?MODULE, {stop},infinity).
 
-
-
-%% cast
+ping() ->
+    gen_server:call(?MODULE, {ping}).
 
 %% ====================================================================
 %% Server functions
@@ -68,15 +68,54 @@ stop()-> gen_server:call(?MODULE, {stop},infinity).
 %%          ignore               |
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
-init([]) ->
-    AllEnvs=application:get_all_env(),
-    {cluster_spec,ClusterSpec}=lists:keyfind(cluster_spec,1,AllEnvs),
-    db_etcd:install(),
+init([]) -> 
+    ClusterSpec=db_config:get(cluster_spec),
+
+    LogDir="log_dir",
+    LogFile="logs1.logs",
+ %   LogDirPath=filename:join(ClusterDir,LogDir),
+
+  %  case filelib:is_dir(LogDirPath) of
+    case filelib:is_dir(LogDir) of
+	true->
+	    ok;
+	false->
+	    ok=file:make_dir(LogDir),
+	    LogFilePath=filename:join(LogDir,LogFile),
+	    ok=nodelog:create(LogFilePath)
+    end,
+       
+    % set right cookie based on the ClusterSpec
+
     {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
-        
-    erlang:set_cookie(node(), list_to_atom(Cookie)),
-        
-    {ok, #state{cluster_spec=ClusterSpec},0}.   
+    erlang:set_cookie(node(),list_to_atom(Cookie)),
+
+    
+    % Trade resources
+    [rd:add_local_resource(Type,node())||Type<-?LocalTypes],
+    [rd:add_target_resource_type(Type)||Type<-?TargetTypes],
+    ok=rd:trade_resources(),
+    timer:sleep(3000),
+
+    %% create cluster
+    {ok,_}=connect_server:create_dbase_info(ClusterSpec),    
+    connect_server:create_connect_nodes(ClusterSpec),
+    connect_server:start_monitoring(ClusterSpec),
+    % Controller and Workers
+    {PresentControllers,MissingControllers}=pod_server:create_controller_pods(ClusterSpec),
+    {PresentWorkers,MissingWorkers}=pod_server:create_worker_pods(ClusterSpec),
+ %   io:format("PresentControllers,MissingControllers ~p~n",[{PresentControllers,MissingControllers,?MODULE,?FUNCTION_NAME}]),
+  %  io:format("PresentWorkers,MissingWorkers ~p~n",[{PresentWorkers,MissingWorkers,?MODULE,?FUNCTION_NAME}]),
+    pod_server:start_monitoring(ClusterSpec),
+  
+    % Deploy appls
+    appl_server:deploy_appls(ClusterSpec),
+    appl_server:start_monitoring(ClusterSpec),
+    
+ %   io:format("Started Server ~p~n",[{?MODULE,?LINE}]), 
+    rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,"Servere started"]),
+
+    {ok, #state{}}.   
  
 
 %% --------------------------------------------------------------------
@@ -90,55 +129,6 @@ init([]) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
 
-handle_call({gitpath,ApplSpec},_From, State) ->
-    Reply=db_appl_spec:read(gitpath,ApplSpec),
-    {reply, Reply, State};
-
-handle_call({app,ApplSpec},_From, State) ->
-    Reply=db_appl_spec:read(app,ApplSpec),
-    {reply, Reply, State};
-
-
-handle_call({appl_name,ApplSpec},_From, State) ->
-    Reply=db_appl_spec:read(appl_name,ApplSpec),
-    {reply, Reply, State};
-
-
-handle_call({hostname,HostSpec},_From, State) ->
-    Reply=db_host_spec:read(hostname,HostSpec),
-    {reply, Reply, State};
-
-handle_call({worker_host_specs,ClusterDeploymentSpec},_From, State) ->
-    Reply=db_cluster_deployment:read(worker_host_specs,ClusterDeploymentSpec),
-    {reply, Reply, State};
-
-handle_call({application_spec,ApplicationSpec},_From, State) ->
-    Reply=db_appl_spec:read(ApplicationSpec),
-    {reply, Reply, State};
-
-handle_call({application_deployment_info,ApplDeploymentSpec},_From, State) ->
-    Reply=db_appl_deployment:read(ApplDeploymentSpec),
-    {reply, Reply, State};
-
-handle_call({cluster_application_deployments,
-	     appl_deployment_specs,ClusterApplDeployment},_From, State) ->
-    Reply= db_cluster_application_deployment:read(appl_deployment_specs,ClusterApplDeployment),
-    
-    {reply, Reply, State};
-handle_call({cluster_application_deployments,
-	     cluster_spec,ClusterSpec},_From, State) ->
-    Reply=[SpecId||{SpecId,X_ClusterSpec,_ApplDeploySpecs}<-db_cluster_application_deployment:read_all(),
-						       X_ClusterSpec=:=ClusterSpec],
-    {reply, Reply, State};
-
-handle_call({cluster_spec},_From, State) ->
-    Reply=State#state.cluster_spec,
-    {reply, Reply, State};
-
-
-handle_call({get_state},_From, State) ->
-    Reply=State,
-    {reply, Reply, State};
 
 handle_call({ping},_From, State) ->
     Reply=pong,
@@ -155,6 +145,8 @@ handle_call(Request, From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
+
+
 handle_cast(Msg, State) ->
     io:format("unmatched match cast ~p~n",[{Msg,?MODULE,?LINE}]),
     {noreply, State}.
@@ -166,21 +158,6 @@ handle_cast(Msg, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
-
-handle_info(timeout, State) -> %% Initil start - kick orchestration 
- %   io:format("timeout ~p~n",[{?MODULE,?LINE}]), 
-    [rd:add_local_resource(Type,Instance)||{Type,Instance}<-?LocalResources],
-    [rd:add_target_resource_type(Type)||Type<-?Target],
-    rd:trade_resources(),
-    timer:sleep(3000),
-    ok=rd:rpc_call(db_etcd,db_cluster_instance,create_table,[],5000),
-    InstanceId=erlang:integer_to_list(os:system_time(microsecond),36)++"_id",
-    ok=ops_connect_operator_server:initiate(InstanceId),
-    ok=ops_pod_operator_server:initiate(InstanceId),
-    ok=ops_appl_operator_server:initiate(InstanceId),
-    
-    {noreply, State};
-
 handle_info(Info, State) ->
     io:format("unmatched match~p~n",[{Info,?MODULE,?LINE}]), 
     {noreply, State}.
@@ -203,4 +180,9 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% --------------------------------------------------------------------
 %%% Internal functions
+%% --------------------------------------------------------------------
+%% --------------------------------------------------------------------
+%% Function: terminate/2
+%% Description: Shutdown the server
+%% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
