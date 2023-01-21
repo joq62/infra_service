@@ -5,7 +5,8 @@ all:
 	rm -rf Mnesia.*;
 	rm -rf *.dir;
 	rm -f rebar.lock;
-	rm -rf pod;
+	rm -rf common;
+	rm -rf sd;
 	rm -rf nodelog;
 	rm -rf db_etcd;
 #	tests 
