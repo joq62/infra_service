@@ -20,7 +20,7 @@ all:
 	git add -f *;
 	git commit -m $(m);
 	git push;
-	echo Ok there you go!
+	echo Ok there you go!make
 build:
 	rm -rf  *~ */*~ src/*.beam test/*.beam test_ebin erl_cra*;
 	rm -rf _build logs log *.pod_dir;
@@ -58,8 +58,10 @@ eunit:
 	mkdir tests_ebin;
 	erlc -I include -o tests_ebin tests/*.erl;
 #  	dependencies
-	rm -rf pod;
-	git clone https://github.com/joq62/pod.git;
+	rm -rf common;
+	git clone https://github.com/joq62/common.git;
+	rm -rf sd;
+	git clone https://github.com/joq62/sd.git;
 	rm -rf nodelog;
 	git clone https://github.com/joq62/nodelog.git;
 	rm -rf db_etcd;

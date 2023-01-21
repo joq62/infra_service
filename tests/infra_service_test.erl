@@ -78,7 +78,8 @@ ensure_right_cookie(ClusterSpec)->
 start_local_appls(ClusterSpec)->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
-    ok=application:start(pod),
+    ok=application:start(common),
+    ok=application:start(sd),
     ok=application:start(db_etcd),
     pong=db_etcd:ping(),
 
@@ -125,10 +126,12 @@ start_infra_appls(ClusterSpec)->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
     {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),    
-    StoppedPod=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-					    pod==App],
-    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedPod,[])],
-
+    StoppedCommon=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+					    common==App],
+    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedCommon,[])],
+    StoppedSd=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+					    sd==App],
+    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedCommon,[])],
 
     StoppedNodelog=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
 					    nodelog==App],
@@ -218,7 +221,7 @@ start_parents_pods()->
 					   common==App],
     []=[{error,Reason}||{error,Reason}<-create_appl(StoppedCommon,[])],
     StoppedResourceDiscovery=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-						      resource_discovery==App],
+						      sd==App],
     []=[{error,Reason}||{error,Reason}<-create_appl(StoppedResourceDiscovery,[])],
     % Check if all started 
     {ok,[]}=parent_server:stopped_nodes(),
