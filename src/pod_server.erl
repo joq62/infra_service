@@ -20,6 +20,7 @@
 
 %% External exports
 -export([
+	 create_pod/1,
 	 create_pod/5,
 	 load_desired_state/1,
 	 desired_nodes/0,
@@ -73,7 +74,8 @@ stop()-> gen_server:call(?MODULE, {stop},infinity).
 %-----------------------------------------------------------------------
 load_desired_state(ClusterSpec)->
     gen_server:call(?MODULE,{load_desired_state,ClusterSpec},infinity).
-
+create_pod(PodNode)->
+       gen_server:call(?MODULE, {create_pod,PodNode},infinity).
 create_pod(ParentNode,NodeName,PodDir,PaArgs,EnvArgs)->
     gen_server:call(?MODULE, {create_pod,ParentNode,NodeName,PodDir,PaArgs,EnvArgs},infinity).
 
@@ -212,6 +214,17 @@ handle_call({stopped_nodes},_From, State) ->
 		  end
 	  end,
     {reply, Reply, State};
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+
+handle_call({create_pod,PodNode},_From, State) ->
+    Reply=lib_pod:create_node(PodNode),
+    io:format("Reply, PodNode ~p~n",[{Reply,PodNode,?MODULE,?LINE}]),
+    {reply, Reply, State};
+
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec

@@ -19,6 +19,7 @@
 %% External exports
 -export([
 	 create_node/5,
+	 create_node/1,
 	 load_desired_state/1,
 	 desired_nodes/0,
 	 active_nodes/0,
@@ -78,6 +79,15 @@ stopped_nodes()->
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
+create_node(PodNode)->
+    {ok,ParentNode}=sd:call(db_etcd,db_pod_desired_state,read,[parent_node,PodNode],5000),
+    {ok,NodeName}=sd:call(db_etcd,db_pod_desired_state,read,[node_name,PodNode],5000),
+    {ok,PodDir}=sd:call(db_etcd,db_pod_desired_state,read,[pod_dir,PodNode],5000),
+    {ok,PaArgsList}=sd:call(db_etcd,db_pod_desired_state,read,[pa_args_list,PodNode],5000),
+    {ok,EnvArgs}=sd:call(db_etcd,db_pod_desired_state,read,[env_args,PodNode],5000),
+    create_node(ParentNode,NodeName,PodDir,PaArgsList,EnvArgs).
+
+
 create_node(ParentNode,NodeName,PodDir,PaArgsList,EnvArgs)->
     Result=case rpc:call(ParentNode,net,gethostname,[],5000) of
 	       {badrpc,Reason}->
