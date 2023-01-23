@@ -68,7 +68,9 @@ active_appls()->
 %% @end
 %%--------------------------------------------------------------------
 stopped_appls()->
+    io:format(" ~p~n",[{?MODULE,?FUNCTION_NAME,?LINE}]),
     A1=[{PodNode,sd:call(db_etcd,db_pod_desired_state,read,[appl_spec_list,PodNode],5000)}||PodNode<-sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000)],
+    io:format("A1 ~p~n",[{A1,?MODULE,?FUNCTION_NAME}]),
     A2=[{PodNode,ApplList}||{PodNode,{ok,ApplList}}<-A1],
     PodApplSpecAppList=lists:append([pod_app_list(PodApplSpecList,[])||PodApplSpecList<-A2]),
     
