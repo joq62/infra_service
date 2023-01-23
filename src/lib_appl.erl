@@ -105,6 +105,7 @@ create_appl(ApplSpec,PodNode)->
     create_appl(ApplSpec,PodNode,?TimeOut).
 
 create_appl(ApplSpec,PodNode,TimeOut)->
+    glurk=ApplSpec,
     {ok,PodDir}=sd:call(db_etcd,db_pod_desired_state,read,[pod_dir,PodNode],5000),
     ApplDir=filename:join(PodDir,ApplSpec),
     rpc:call(PodNode,file,del_dir_r,[ApplDir],5000),
@@ -113,8 +114,8 @@ create_appl(ApplSpec,PodNode,TimeOut)->
 		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
 		   {error,["Error during do_start : ",badrpc,Reason,ApplSpec,PodNode,?MODULE,?FUNCTION_NAME,?LINE]};
 	       ok->
-		   {ok,HostSpec}=db_pod_desired_state:read(host_spec,PodNode),
-		   {ok,ApplicationConfig}=db_host_spec:read(application_config,HostSpec),  
+		   {ok,HostSpec}=sd:call(db_etcd,db_pod_desired_state,read,[host_spec,PodNode],5000),
+		   {ok,ApplicationConfig}=sd:call(db_etcd,db_host_spec,read,[application_config,HostSpec],5000),  
 		   _SetEnvResult=[rpc:call(PodNode,application,set_env,[[Config]],5000)||Config<-ApplicationConfig],
 		   {ok,PodApplGitPath}=db_appl_spec:read(gitpath,ApplSpec),
 		   case do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut) of
@@ -122,13 +123,6 @@ create_appl(ApplSpec,PodNode,TimeOut)->
 			   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
 			   {error,["Error during do_start : ",Reason,ApplSpec,PodNode,?MODULE,?FUNCTION_NAME,?LINE]};
 		       ok->
-			   {ok,LocalTypeList}=db_appl_spec:read(local_type,ApplSpec),
-			   [rpc:call(PodNode,rd,add_local_resource,[LocalType,PodNode],5000)||LocalType<-LocalTypeList],
-						%   [rd:add_target_resource_type(LocalType)||LocalType<-LocalTypeList],
-			   {ok,TargetTypeList}=db_appl_spec:read(target_type,ApplSpec),
-			   [rpc:call(PodNode,rd,add_target_resource_type,[TargetType],5000)||TargetType<-TargetTypeList],
-			   rpc:call(PodNode,rd,trade_resources,[],5000),
-			   timer:sleep(2000),
 			   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["application created ",ApplSpec,PodNode]]),
 			   ok
 		   end
@@ -145,7 +139,7 @@ do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut)->
 		    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
 		    {error,["Error when cloning : ", Reason,PodNode,PodApplGitPath,ApplDir,?MODULE,?FUNCTION_NAME,?LINE]};
 		{ok,_}->
-		    {ok,PodApp}=db_appl_spec:read(app,ApplSpec),
+		    {ok,PodApp}=sd:call(db_etcd,db_appl_spec,read,[app,ApplSpec],5000),
 		    ApplEbin=filename:join([ApplDir,"ebin"]),
 		    Paths=[ApplEbin],
 		    case appl:load(PodNode,PodApp,Paths) of
@@ -158,13 +152,6 @@ do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut)->
 				    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
 				    {error,Reason};
 				ok->
-				    {ok,LocalTypeList}=db_appl_spec:read(local_type,ApplSpec),
-				    [rpc:call(PodNode,rd,add_local_resource,[LocalType,PodNode],5000)||LocalType<-LocalTypeList],
-						%   [rd:add_target_resource_type(LocalType)||LocalType<-LocalTypeList],
-				    {ok,TargetTypeList}=db_appl_spec:read(target_type,ApplSpec),
-				    [rpc:call(PodNode,rd,add_target_resource_type,[TargetType],5000)||TargetType<-TargetTypeList],
-				    rpc:call(PodNode,rd,trade_resources,[],5000),
-				    timer:sleep(2000),
 				    ok
 			    end
 		    end
