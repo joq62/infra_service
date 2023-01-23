@@ -105,7 +105,6 @@ create_appl(ApplSpec,PodNode)->
     create_appl(ApplSpec,PodNode,?TimeOut).
 
 create_appl(ApplSpec,PodNode,TimeOut)->
-    glurk=ApplSpec,
     {ok,PodDir}=sd:call(db_etcd,db_pod_desired_state,read,[pod_dir,PodNode],5000),
     ApplDir=filename:join(PodDir,ApplSpec),
     rpc:call(PodNode,file,del_dir_r,[ApplDir],5000),
