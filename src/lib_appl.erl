@@ -53,6 +53,9 @@ desired_appls()->
 %% @end
 %%--------------------------------------------------------------------
 active_appls()->
+    X=sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000),
+    io:format("X ~p~n",[{X,?MODULE,?FUNCTION_NAME}]),
+
     A1=[{PodNode,sd:call(db_etcd,db_pod_desired_state,read,[appl_spec_list,PodNode],5000)}||PodNode<-sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000)],
     A2=[{PodNode,ApplList}||{PodNode,{ok,ApplList}}<-A1],
     PodApplSpecAppList=lists:append([pod_app_list(PodApplSpecList,[])||PodApplSpecList<-A2]),
