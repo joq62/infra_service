@@ -112,23 +112,42 @@ handle_call(Request, From, State) ->
 handle_cast({orchistrate_result,_ResultStartParentPods,
 	     _ResultStartInfraAppls,_ResultStartUserAppls}, State) ->
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Start  : ",?MODULE,?LINE]]),
-    {ok,StoppedParents}=parent_server:stopped_nodes(),
-    {ok,StoppedPods}=pod_server:stopped_nodes(),
-    {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),
 
-    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["StoppedParents  : ",StoppedParents,?MODULE,?LINE]]),
+    
+   % {ok,StoppedParents}=parent_server:stopped_nodes(),
+  %  {ok,StoppedPods}=pod_server:stopped_nodes(),
+  %  {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),
 
-    case {StoppedParents,StoppedPods,StoppedApplInfoLists} of
-	{[],[],[]}->
-	    ok;
-	_->
-	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["StoppedParents  : ",StoppedParents,?MODULE,?LINE]]),
-	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["StoppedPods  : ",StoppedPods,?MODULE,?LINE]]),
-	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["StoppedApplInfoLists  : ",StoppedApplInfoLists,?MODULE,?LINE]]),
-	    io:format("StoppedParents ~p~n",[{StoppedParents,?MODULE,?LINE}]),
-	    io:format("StoppedPods ~p~n",[{StoppedPods,?MODULE,?LINE}]),
-	    io:format("StoppedApplInfoLists ~p~n",[{StoppedApplInfoLists,?MODULE,?LINE}])
+    case parent_server:stopped_nodes() of
+	{error,Reason2}->
+	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["StoppedParents  : ",Reason2,?MODULE,?LINE]]);
+	{ok,[]}->
+	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["StoppedParents  : ",ok,?MODULE,?LINE]]);
+	{ok,StoppedParents}->
+	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["StoppedParents  : ",StoppedParents,?MODULE,?LINE]])
     end,
+
+    case pod_server:stopped_nodes() of
+	{error,Reason1}->
+	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["StoppedPods  : ",Reason1,?MODULE,?LINE]]);
+	{ok,[]}->
+	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["StoppedPods  : ",ok,?MODULE,?LINE]]);
+	{ok,StoppedPods}->
+	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["StoppedPods  : ",StoppedPods,?MODULE,?LINE]])
+    end,
+
+  
+
+    case appl_server:stopped_appls() of
+	{error,Reason3}->
+	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["StoppedApplInfoLists  : ",Reason3,?MODULE,?LINE]]);
+	{ok,[]}->
+	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["StoppedApplInfoLists  : ",ok,?MODULE,?LINE]]);
+	{ok,StoppedApplInfoLists}->
+	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["StoppedApplInfoLists  : ",StoppedApplInfoLists,?MODULE,?LINE]])
+    end,
+    
+    
     rpc:cast(node(),lib_infra_service,orchistrate,[]),
     {noreply, State};
 
