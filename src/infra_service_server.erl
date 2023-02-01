@@ -119,6 +119,9 @@ handle_cast({orchistrate_result,_ResultStartParentPods,
 	{[],[],[]}->
 	    ok;
 	_->
+	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["StoppedParents  : ",StoppedParents,?MODULE,?LINE]]),
+	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["StoppedPods  : ",StoppedPods,?MODULE,?LINE]]),
+	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["StoppedApplInfoLists  : ",StoppedApplInfoLists,?MODULE,?LINE]]),
 	    io:format("StoppedParents ~p~n",[{StoppedParents,?MODULE,?LINE}]),
 	    io:format("StoppedPods ~p~n",[{StoppedPods,?MODULE,?LINE}]),
 	    io:format("StoppedApplInfoLists ~p~n",[{StoppedApplInfoLists,?MODULE,?LINE}])
