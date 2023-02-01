@@ -111,9 +111,12 @@ handle_call(Request, From, State) ->
 
 handle_cast({orchistrate_result,_ResultStartParentPods,
 	     _ResultStartInfraAppls,_ResultStartUserAppls}, State) ->
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Start  : ",?MODULE,?LINE]]),
     {ok,StoppedParents}=parent_server:stopped_nodes(),
     {ok,StoppedPods}=pod_server:stopped_nodes(),
     {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),
+
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["StoppedParents  : ",StoppedParents,?MODULE,?LINE]]),
 
     case {StoppedParents,StoppedPods,StoppedApplInfoLists} of
 	{[],[],[]}->
