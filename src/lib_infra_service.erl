@@ -36,8 +36,12 @@ orchistrate()->
 orchistrate(SleepInterval)->
     timer:sleep(SleepInterval),
     ResultStartParentPods=rpc:call(node(),?MODULE,start_parents_pods,[],15*1000),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultStartParentPods  : ",ResultStartParentPods,?MODULE,?LINE]]),
+
     ResultStartInfraAppls=rpc:call(node(),?MODULE,start_infra_appls,[],15*1000),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultStartInfraAppls  : ",ResultStartInfraAppls,?MODULE,?LINE]]),
     ResultStartUserAppls=rpc:call(node(),?MODULE,start_user_appls,[],15*1000), 
+
     rpc:cast(node(),infra_service,orchistrate_result,[ResultStartParentPods,
 						      ResultStartInfraAppls,
 						      ResultStartUserAppls]).
