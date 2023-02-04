@@ -14,6 +14,7 @@
 -define(SleepInterval,20*1000).
 %% API
 -export([
+	 init_servers/1,
 	 ensure_right_cookie/1,
 	 orchistrate/0,
 	 orchistrate/1,
@@ -31,6 +32,30 @@
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
+init_servers(ClusterSpec)->
+    Result=case parent_server:load_desired_state(ClusterSpec) of
+	        {error,Reason}->
+		   {error,Reason};
+	       ok ->
+		   case pod_server:load_desired_state(ClusterSpec) of
+		       {error,Reason}->
+			   {error,Reason};
+		       ok ->
+			   case appl_server:load_desired_state(ClusterSpec) of
+			       {error,Reason}->
+				   {error,Reason};
+			       ok ->
+				   ok
+			   end
+		   end
+	   end,
+    Result.
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+
 orchistrate()->
     orchistrate(?SleepInterval).
 orchistrate(SleepInterval)->

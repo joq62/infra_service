@@ -77,14 +77,25 @@ handle_call({is_config},_From, State) ->
 handle_call({config,ClusterSpec},_From, State) ->
     Reply=case State#state.cluster_spec of 
 	      undefined->
-		  case rpc:cast(node(),lib_infra_service,orchistrate,[]) of
+		  case rpc:call(node(),lib_infra_service,init_servers,[ClusterSpec]) of
 		      {badrpc,Reason}->
 			  NewState=State,
-			  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error when calling orchistrate  : ",Reason,?MODULE,?LINE]]),
-			  {error,["Error when calling orchistrate :",Reason,?MODULE,?LINE]};
-		      true->
-			  NewState=State#state{cluster_spec=ClusterSpec},
-			  ok
+			  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error when calling init_servers  : ",Reason,?MODULE,?LINE]]),
+			  {error,["Error when calling init_servers :",Reason,?MODULE,?LINE]};
+		      {error,Reason}->
+			  NewState=State,
+			  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error when calling init_servers  : ",Reason,?MODULE,?LINE]]),
+			  {error,["Error when calling init_servers :",init_servers,?MODULE,?LINE]};
+		      ok->
+			  case rpc:cast(node(),lib_infra_service,start_orchistrate,[]) of
+			      {badrpc,Reason}->
+				  NewState=State,
+				  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error when calling orchistrate  : ",Reason,?MODULE,?LINE]]),
+				  {error,["Error when calling orchistrate :",Reason,?MODULE,?LINE]};
+			      true->
+				  NewState=State#state{cluster_spec=ClusterSpec},
+				  ok
+			  end
 		  end;
 	      AlreadyConfig->
 		  NewState=State,
