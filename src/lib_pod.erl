@@ -67,7 +67,7 @@ active_nodes()->
 %% @end
 %%--------------------------------------------------------------------
 stopped_nodes()->
-    AllNodes=db_pod_desired_state:get_all_id(),
+    AllNodes=sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000),
     {ok,ActiveNodes}=active_nodes(),
     StoppedNodes=[Node||Node<-AllNodes,
 			false==lists:member(Node,ActiveNodes)],
@@ -145,7 +145,7 @@ create_node(ParentNode,NodeName,PodDir,PaArgsList,EnvArgs)->
 %%--------------------------------------------------------------------
 
 load_desired_state(ClusterSpec)->
-    {ok,Pods}=db_cluster_spec:read(pods,ClusterSpec),
+    {ok,Pods}=sd:call(db_etcd,db_cluster_spec,read,[pods,ClusterSpec],5000),
     LoadResult=[{error,Reason}|| {error,Reason}<-load_desired_state(Pods,ClusterSpec,[])],
     case LoadResult of
 	[]->
@@ -159,12 +159,12 @@ load_desired_state([],_ClusterSpec,Acc)->
 load_desired_state([{NumPods,HostSpec}|T],ClusterSpec,Acc) ->
     false=lists:member({ok,HostSpec},Acc),
     
-    [ParentNode]=[ParentNode||ParentNode<-db_parent_desired_state:get_all_id(),
-			      {ok,HostSpec}==db_parent_desired_state:read(host_spec,ParentNode),
-			      {ok,ClusterSpec}==db_parent_desired_state:read(cluster_spec,ParentNode)],
+    [ParentNode]=[ParentNode||ParentNode<-sd:call(db_etcd,db_parent_desired_state,get_all_id,[],5000),
+			      {ok,HostSpec}==sd:call(db_etcd,db_parent_desired_state,read,[host_spec,ParentNode],5000),
+			      {ok,ClusterSpec}==sd:call(db_etcd,db_parent_desired_state,read,[cluster_spec,ParentNode],5000)],
 
-    {ok,RootDir}=db_cluster_spec:read(root_dir,ClusterSpec),
-%    {ok,HostName}=db_host_spec:read(hostname,HostSpec),
+    {ok,RootDir}=sd:call(db_etcd,db_cluster_spec,read,[root_dir,ClusterSpec],5000),
+%    {ok,HostName}=db_host_spec:read,[hostname,HostSpec),
     BaseNodeName=ClusterSpec++"_pod",
     Result=load_info(NumPods,RootDir,BaseNodeName,ClusterSpec,HostSpec,ParentNode,[]),
     load_desired_state(T,ClusterSpec,[Result|Acc]).
@@ -173,13 +173,13 @@ load_info(0,_RootDir,_BaseNodeName,_ClusterSpec,_HostSpec,_ParentNode,Acc)->
     Acc;
 load_info(N,RootDir,BaseNodeName,ClusterSpec,HostSpec,ParentNode,Acc)->
     NodeName=integer_to_list(N)++"_"++BaseNodeName,
-    {ok,HostName}=db_host_spec:read(hostname,HostSpec),
+    {ok,HostName}=sd:call(db_etcd,db_host_spec,read,[hostname,HostSpec],5000),
     PodNode=list_to_atom(NodeName++"@"++HostName),
     PodDir=filename:join(RootDir,NodeName),
     PaArgsList=[],
     EnvArgs=" ",             
     AppSpecList=[],
-    Result=case db_pod_desired_state:create(PodNode,NodeName,PodDir,ParentNode,AppSpecList,ClusterSpec,HostSpec,PaArgsList,EnvArgs) of
+    Result=case sd:call(db_etcd,db_pod_desired_state,create,[PodNode,NodeName,PodDir,ParentNode,AppSpecList,ClusterSpec,HostSpec,PaArgsList,EnvArgs],5000) of
 	       {atomic,ok}->
 		   ok;
 	       Reason->

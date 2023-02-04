@@ -36,7 +36,7 @@
 %% @end
 %%--------------------------------------------------------------------
 desired_nodes()->
-    Result=case sd:call(db_etcd,db_parent_desired_state,get_all_id,[],5000) of
+    Result=case db_parent_desired_state:get_all_id() of
 	       {error,Reason}->
 		   {error,Reason};
 	       []->
@@ -52,10 +52,10 @@ desired_nodes()->
 %% @end
 %%--------------------------------------------------------------------
 active_nodes()->
-    AllNodes=sd:call(db_etcd,db_parent_desired_state,get_all_id,[],5000),
+    AllNodes=db_parent_desired_state:get_all_id(),
     [Node1|_]=AllNodes,
-    {ok,ClusterSpec}=sd:call(db_etcd,db_parent_desired_state,read,[cluster_spec,Node1],5000),
-    {ok,RootDir}=sd:call(db_etcd,db_cluster_spec,read,[root_dir,ClusterSpec],5000),
+    {ok,ClusterSpec}=db_parent_desired_state:read(cluster_spec,Node1),
+    {ok,RootDir}=db_cluster_spec:read(root_dir,ClusterSpec),
     RunningNodes=[Node||Node<-AllNodes,
 			pong==net_adm:ping(Node)],
     ActiveNodes=[Node||Node<-RunningNodes,
@@ -69,7 +69,7 @@ active_nodes()->
 %% @end
 %%--------------------------------------------------------------------
 stopped_nodes()->
-    AllNodes=sd:call(db_etcd,db_parent_desired_state,get_all_id,[],5000),
+    AllNodes=db_parent_desired_state:get_all_id(),
     {ok,ActiveNodes}=active_nodes(),
     StoppedNodes=[Node||Node<-AllNodes,
 			false==lists:member(Node,ActiveNodes)],
@@ -83,10 +83,10 @@ stopped_nodes()->
 %% @end
 %%--------------------------------------------------------------------
 create_node(ParentNode)->
-    {ok,HostSpec}=sd:call(db_etcd,db_parent_desired_state,read,[host_spec,ParentNode],5000),
-    {ok,NodeName}=sd:call(db_etcd,db_parent_desired_state,read,[node_name,ParentNode],5000),
-    {ok,ClusterSpec}=sd:call(db_etcd,db_parent_desired_state,read,[cluster_spec,ParentNode],5000),
-    {ok,Cookie}=sd:call(db_etcd,db_cluster_spec,read,[cookie,ClusterSpec],5000),
+    {ok,HostSpec}=db_parent_desired_state:read(host_spec,ParentNode),
+    {ok,NodeName}=db_parent_desired_state:read(node_name,ParentNode),
+    {ok,ClusterSpec}=db_parent_desired_state:read(cluster_spec,ParentNode),
+    {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
     EnvArgs=" -detached ",
     PaArgs=" ",
     TimeOut=10*1000,
@@ -104,7 +104,7 @@ create_node(ParentNode)->
 %%--------------------------------------------------------------------
 
 load_desired_state(ClusterSpec)->
-    {ok,Pods}=sd:call(db_etcd,db_cluster_spec,read,[pods,ClusterSpec],5000),
+    {ok,Pods}=db_cluster_spec:read(pods,ClusterSpec),
     LoadResult=[{error,Reason}|| {error,Reason}<-load_desired_state(Pods,ClusterSpec,[])],
     case LoadResult of
 	[]->
@@ -117,16 +117,16 @@ load_desired_state([],_ClusterSpec,Acc)->
     Acc;
 load_desired_state([{_NumPods,HostSpec}|T],ClusterSpec,Acc) ->
     false=lists:member({ok,HostSpec},Acc),
-    {ok,RootDir}=sd:call(db_etcd,db_cluster_spec,read,[root_dir,ClusterSpec],5000),
-    {ok,HostName}=sd:call(db_etcd,db_host_spec,read,[hostname,HostSpec],5000),
+    {ok,RootDir}=db_cluster_spec:read(root_dir,ClusterSpec),
+    {ok,HostName}=db_host_spec:read(hostname,HostSpec),
     NodeName=ClusterSpec++"_parent",
     ParentNode=list_to_atom(NodeName++"@"++HostName),
     RootPaArgs=" -pa "++RootDir++" ",
     PathCommonFuns=filename:join([RootDir,"*","ebin"]),
     CommonFunsPaArgs=" -pa "++PathCommonFuns,
     EnvArgs=" ",
-    Result=case sd:call(db_etcd,db_parent_desired_state,create,[ParentNode,NodeName,ClusterSpec,HostSpec,
-					       RootPaArgs,CommonFunsPaArgs,EnvArgs],5000) of
+    Result=case db_parent_desired_state:create(ParentNode,NodeName,ClusterSpec,HostSpec,
+					       RootPaArgs,CommonFunsPaArgs,EnvArgs) of
 	       {atomic,ok}->
 		   ok;
 	       Reason->

@@ -117,7 +117,7 @@ handle_cast({orchistrate_result,_ResultStartParentPods,
    % {ok,StoppedParents}=parent_server:stopped_nodes(),
   %  {ok,StoppedPods}=pod_server:stopped_nodes(),
   %  {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),
-
+   
     case parent_server:stopped_nodes() of
 	{error,Reason2}->
 	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["StoppedParents  : ",Reason2,?MODULE,?LINE]]);
