@@ -200,7 +200,8 @@ load_desired_state(ClusterSpec)->
     ApplDeploymentSpecInfoList=[sd:call(db_etcd,db_appl_deployment,read,[ApplDeploymentId],5000)||ApplDeploymentId<-AllDeploymentId,
 			       {ok,ClusterSpec}==sd:call(db_etcd,db_appl_deployment,read,[cluster_spec,ApplDeploymentId],5000)],
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ApplDeploymentSpecInfoList : ",ApplDeploymentSpecInfoList,?MODULE,?LINE]]),
-    _Result=main_load_desired_state(ApplDeploymentSpecInfoList,HostSpecList,[]),
+    Result=main_load_desired_state(ApplDeploymentSpecInfoList,HostSpecList,[]),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Result : ",Result,?MODULE,?LINE]]),
  %   io:format("Result ~p~n",[{Result,?MODULE,?FUNCTION_NAME,?LINE}]).
     ok.
 
