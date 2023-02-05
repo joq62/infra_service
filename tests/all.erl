@@ -59,14 +59,18 @@ start([ClusterSpec,HostSpec])->
     io:format("DbPod ~p~n",[{DbPod,?MODULE,?FUNCTION_NAME,?LINE}]),
     %%- Initiate db_etcd with desired_State !!
     
-    glurk=parent_server:load_desired_state(ClusterSpec),
+    ok=parent_server:load_desired_state(ClusterSpec),
     ok=pod_server:load_desired_state(ClusterSpec),
+    ok=appl_server:load_desired_state(ClusterSpec),
 
-    %%-- create db_etcd
+    %%-- create infra_service
     [{ok,InfraPod,InfraApplSpec}]=lib_infra_service:create_pods_based_appl("infra_service"),
-    
+    [{ok,_,_,_}]=lib_infra_service:create_appl([{InfraPod,"common",common}]),
+    [{ok,_,_,_}]=lib_infra_service:create_appl([{InfraPod,"sd",sd}]),
+    ok=lib_infra_service:create_infra_appl({InfraPod,"infra_service",infra_service}),
 
-%    io:format("InfraServicePods !!! ~p~n",[{InfraServicePods,?MODULE,?FUNCTION_NAME}]),
+    WhichApplications2=[{Node,rpc:call(Node,application,which_applications,[],5000)}||Node<-nodes()],
+    io:format("WhichApplications2 !!! ~p~n",[{WhichApplications2,?MODULE,?FUNCTION_NAME,?LINE}]),
     
        
     io:format("Stop OK !!! ~p~n",[{?MODULE,?FUNCTION_NAME}]),

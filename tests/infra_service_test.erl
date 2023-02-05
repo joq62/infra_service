@@ -158,9 +158,7 @@ initiate_local_dbase(ClusterSpec)->
     ok=parent_server:load_desired_state(ClusterSpec),
     ok=pod_server:load_desired_state(ClusterSpec),
     ok=appl_server:load_desired_state(ClusterSpec),	
-    {error,["Already initiated : ","c200_c201"]}=appl_server:load_desired_state(glurk),
-    {error,["Already initiated : ","c200_c201"]}=parent_server:load_desired_state(ClusterSpec),
-  
+    
     
     ok.
 
