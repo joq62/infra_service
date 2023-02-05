@@ -47,13 +47,13 @@ start([ClusterSpec,HostSpec])->
     [{ok,NodelogPod,NodelogApplSpec}]=lib_infra_service:create_pods_based_appl("nodelog"),
     [{ok,_,_,_}]=lib_infra_service:create_appl([{NodelogPod,"common",common}]),
     [{ok,_,_,_}]=lib_infra_service:create_appl([{NodelogPod,"sd",sd}]),
-    ok=lib_infra_service:create_infra_appl({NodelogPod,"nodelog",nodelog}),
+    ok=lib_infra_service:create_infra_appl({NodelogPod,"nodelog",nodelog},ClusterSpec),
     
     %%-- create db_etcd
     [{ok,DbPod,DbApplSpec}]=lib_infra_service:create_pods_based_appl("db_etcd"),
     [{ok,_,_,_}]=lib_infra_service:create_appl([{DbPod,"common",common}]),
     [{ok,_,_,_}]=lib_infra_service:create_appl([{DbPod,"sd",sd}]),
-    ok=lib_infra_service:create_infra_appl({DbPod,"db_etcd",db_etcd}),
+    ok=lib_infra_service:create_infra_appl({DbPod,"db_etcd",db_etcd},ClusterSpec),
     application:stop(db_etcd),
     [DbPod]=sd:get_node(db_etcd),
     io:format("DbPod ~p~n",[{DbPod,?MODULE,?FUNCTION_NAME,?LINE}]),
@@ -67,7 +67,7 @@ start([ClusterSpec,HostSpec])->
     [{ok,InfraPod,InfraApplSpec}]=lib_infra_service:create_pods_based_appl("infra_service"),
     [{ok,_,_,_}]=lib_infra_service:create_appl([{InfraPod,"common",common}]),
     [{ok,_,_,_}]=lib_infra_service:create_appl([{InfraPod,"sd",sd}]),
-    ok=lib_infra_service:create_infra_appl({InfraPod,"infra_service",infra_service}),
+    ok=lib_infra_service:create_infra_appl({InfraPod,"infra_service",infra_service},ClusterSpec),
 
     WhichApplications2=[{Node,rpc:call(Node,application,which_applications,[],5000)}||Node<-nodes()],
     io:format("WhichApplications2 !!! ~p~n",[{WhichApplications2,?MODULE,?FUNCTION_NAME,?LINE}]),
