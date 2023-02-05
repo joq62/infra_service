@@ -217,7 +217,7 @@ load_desired_state({SpecId,ApplSpec,_Vsn,ClusterSpec,1,each_pod},[HostSpec|T],Ac
     Candidates=[PodNode||{PodNode,{ok,ApplSpecList}}<-NodeApplSpecList,
 			 false==lists:member(ApplSpec,ApplSpecList),
 			 {ok,ClusterSpec}==sd:call(db_etcd,db_pod_desired_state,read,[cluster_spec,PodNode],5000)],
-    AddResult=[{db_pod_desired_state:add_appl_list(ApplSpec,PodNode),ApplSpec,PodNode,HostSpec}||PodNode<-Candidates],
+    AddResult=[{sd:call(db_etcd,db_pod_desired_state,add_appl_list,[ApplSpec,PodNode],5000),ApplSpec,PodNode,HostSpec}||PodNode<-Candidates],
     ErrorResult=[{error,["ERROR: Aborted ApplSpec,PodNode,HostSpec : ",Reason,ApplSpec,PodNode,HostSpec]}||
 		    {{aborted,Reason},ApplSpec,PodNode,HostSpec}<-AddResult],
     OkResult=[ok||{atomic,ok}<-AddResult],
