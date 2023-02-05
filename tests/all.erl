@@ -37,17 +37,30 @@ start([ClusterSpec,HostSpec])->
     ok=infra_service_test:start_local_appls(ClusterSpec),
     ok=infra_service_test:initiate_local_dbase(ClusterSpec),
     ok=infra_service_test:ensure_right_cookie(ClusterSpec),
+    %%-- Start parents
     {ok,ActiveParents}=infra_service_test:start_parents(),
     io:format("ActiveParents !!! ~p~n",[{ActiveParents,?MODULE,?FUNCTION_NAME}]),
+    %%-- create pods
+    [{ok,NodelogPod,NodelogApplSpec}]=lib_infra_service:create_pods_based_appl("nodelog"),
+    [{ok,DbPod,DbApplSpec}]=lib_infra_service:create_pods_based_appl("db_etcd"),
+    [{ok,InfraPod,InfraApplSpec}]=lib_infra_service:create_pods_based_appl("infra_service"),
+    %%-- create nodelog appl
+   % glurk=rpc:call(NodelogPod,application,which_applications,[],5000),
+    [{ok,_,_,_}]=lib_infra_service:create_appl([{NodelogPod,"common",common}]),
+    [{ok,_,_,_}]=lib_infra_service:create_appl([{NodelogPod,"sd",sd}]),
+    [{ok,_,_,_}]=lib_infra_service:create_infra_appl({NodelogPod,"nodelog",nodelog}),
+    
+    
 
-    NodelogPods=lib_infra_service:create_pods_based_appl("nodelog"),
-    io:format("NodelogPods !!! ~p~n",[{NodelogPods,?MODULE,?FUNCTION_NAME}]),
+    
 
-    DbEtcdPods=lib_infra_service:create_pods_based_appl("db_etcd"),
-    io:format("DbEtcdPods !!! ~p~n",[{DbEtcdPods,?MODULE,?FUNCTION_NAME}]),
+    %%-- 
 
-    InfraServicePods=lib_infra_service:create_pods_based_appl("infra_service"),
-    io:format("InfraServicePods !!! ~p~n",[{InfraServicePods,?MODULE,?FUNCTION_NAME}]),
+
+
+
+
+%    io:format("InfraServicePods !!! ~p~n",[{InfraServicePods,?MODULE,?FUNCTION_NAME}]),
     
        
     io:format("Stop OK !!! ~p~n",[{?MODULE,?FUNCTION_NAME}]),

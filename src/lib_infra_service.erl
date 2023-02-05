@@ -14,6 +14,7 @@
 -define(SleepInterval,20*1000).
 %% API
 -export([
+	 create_appl/1,
 	 create_infra_appl/1,
 	 create_pods_based_appl/1,
 	 init_servers/1,
@@ -126,15 +127,12 @@ start_infra_appls()->
 %% @end
 %%--------------------------------------------------------------------
 create_pods_based_appl(ApplSpec)->
-  %  AllPodsApplSpecs=[{PodNode,db_pod_desired_state:read(appl_spec_list,PodNode)}||PodNode<-db_pod_desired_state:get_all_id()],
-  %  io:format("AllPodsApplSpecs !!! ~p~n",[{AllPodsApplSpecs,?MODULE,?FUNCTION_NAME,?LINE}]),
     AllPodsApplSpecsToStart=[{PodNode,db_pod_desired_state:read(appl_spec_list,PodNode)}||PodNode<-db_pod_desired_state:get_all_id(),
 											  pang==net_adm:ping(PodNode)],
-    io:format("AllPodsApplSpecsToStart !!! ~p~n",[{AllPodsApplSpecsToStart,?MODULE,?FUNCTION_NAME,?LINE}]),
     PodsToStart=[PodNode||{PodNode,{ok,ApplSpecList}}<-AllPodsApplSpecsToStart,
 			  lists:member(ApplSpec,ApplSpecList)],
-    io:format("PodsToStart ~p~n",[{PodsToStart,?MODULE,?FUNCTION_NAME,?LINE}]),
-    [create_pod(PodNode)||PodNode<-PodsToStart].
+ %   io:format("PodsToStart, ApplSpec ~p~n",[{PodsToStart,ApplSpec,?MODULE,?FUNCTION_NAME,?LINE}]),
+    [{create_pod(PodNode),PodNode,ApplSpec}||PodNode<-PodsToStart].
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -155,7 +153,7 @@ create_pod(PodNode)->
 %% @end
 %%--------------------------------------------------------------------
 create_infra_appl({PodNode,ApplSpec,nodelog})->
-    Result= case create_appl({PodNode,ApplSpec,nodelog},[]) of
+    Result= case create_appl({PodNode,ApplSpec,nodelog}) of
 		{error,Reason}->
 		    {error,Reason};
 		ok->
@@ -245,6 +243,8 @@ ensure_right_cookie(ClusterSpec)->
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
+create_appl(ApplSpecInfoList)->
+    create_appl(ApplSpecInfoList,[]).
 create_appl([],Acc)->
     Acc;
 create_appl([{PodNode,ApplSpec,App}|T],Acc)->
