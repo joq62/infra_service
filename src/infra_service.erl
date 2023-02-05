@@ -48,6 +48,7 @@ ping() ->
 is_config()->
     gen_server:call(?SERVER, {is_config}).
 config(ClusterSpec)->
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DEBUG config,ClusterSpec  : ",config,ClusterSpec,?MODULE,?LINE]]),
     gen_server:call(?SERVER, {config,ClusterSpec}).
     
 

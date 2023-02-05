@@ -51,7 +51,9 @@
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
 init([]) -> 
-     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,"Servere started"]),
+    R=rpc:call('do_test@c50',all,print,["kuken ~p~n",[{?MODULE,?LINE,node()}]],5000),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,[" R",R,node()]]),
+     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Servere started",node()]]),
     {ok, #state{cluster_spec=undefined}}.   
  
 
@@ -66,6 +68,7 @@ init([]) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
 handle_call({is_config},_From, State) ->
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DEBUG is_confi  : ",?MODULE_STRING,?LINE]]),
     Reply=case State#state.cluster_spec of 
 	      undefined->
 		  false;
@@ -75,9 +78,12 @@ handle_call({is_config},_From, State) ->
     {reply, Reply, State};
 
 handle_call({config,ClusterSpec},_From, State) ->
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DEBUG config,ClusterSpec  : ",config,ClusterSpec,?MODULE,?LINE]]),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DEBUG State#state.cluster_spec  : ",State#state.cluster_spec,?MODULE,?LINE]]),
+    
     Reply=case State#state.cluster_spec of 
 	      undefined->
-		  case rpc:call(node(),lib_infra_service,init_servers,[ClusterSpec]) of
+		  case rpc:call(node(),lib_infra_service,init_servers,[ClusterSpec],2*5000) of
 		      {badrpc,Reason}->
 			  NewState=State,
 			  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error when calling init_servers  : ",Reason,?MODULE,?LINE]]),
@@ -105,6 +111,7 @@ handle_call({config,ClusterSpec},_From, State) ->
     {reply, Reply, NewState};
 
 handle_call({ping},_From, State) ->
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ping",node()]]),
     Reply=pong,
     {reply, Reply, State};
 

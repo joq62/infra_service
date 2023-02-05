@@ -86,13 +86,15 @@ start_local_appls(ClusterSpec)->
     %--
     ok=db_etcd:config(),
     %--
-    {ok,_}=parent_server:start(),
+
+    ok=application:start(infra_service),
+ %   {ok,_}=parent_server:start(),
     pong=parent_server:ping(),
     %--
-    {ok,_}=pod_server:start(),
+ %   {ok,_}=pod_server:start(),
     pong=pod_server:ping(),
     %--
-    {ok,_}=appl_server:start(),
+ %   {ok,_}=appl_server:start(),
     pong=appl_server:ping(),
 
     ok.
@@ -133,33 +135,31 @@ start_infra_appls(ClusterSpec)->
 					    sd==App],
     []=[{error,Reason}||{error,Reason}<-create_appl(StoppedCommon,[])],
 
-    StoppedNodelog=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-					    nodelog==App],
-    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedNodelog,[])],
-    
+    % config db_etcd
+
     StoppedDbEtcd=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
 					   db_etcd==App],
-    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedDbEtcd,[])],
+    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedDbEtcd,[])], 
 
-    StoppedInfraService=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-					   infra_service==App],
-    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedInfraService,[])],
-    {ok,ActiveApplsInfoList}=appl_server:active_appls(),
-    true=lists:keymember(nodelog,3,ActiveApplsInfoList),
-    true=lists:keymember(db_etcd,3,ActiveApplsInfoList),
-    true=lists:keymember(infra_service,3,ActiveApplsInfoList),
+   
+    {ok,ActiveApplsInfoList_1}=appl_server:active_appls(),
 
-    % config db_etcd
-    [{DbEtcdNode,DbEtcdApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoList,
+    [{DbEtcdNode,DbEtcdApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoList_1,
 					  db_etcd==App],
 
     false=rpc:call(DbEtcdNode,DbEtcdApp,is_config,[],5000),
     ok=rpc:call(DbEtcdNode,DbEtcdApp,config,[],5000),
     true=rpc:call(DbEtcdNode,DbEtcdApp,is_config,[],5000),
+    true=lists:keymember(db_etcd,3,ActiveApplsInfoList_1),
 
-    [{NodelogNode,NodelogApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoList,
+    %%-- nodelog -------------------------------------------------------------
+    StoppedNodelog=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
 					    nodelog==App],
-  
+    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedNodelog,[])],
+
+    {ok,ActiveApplsInfoList_2}=appl_server:active_appls(),
+    [{NodelogNode,NodelogApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoList_2,
+					    nodelog==App],
     false=rpc:call(NodelogNode,nodelog,is_config,[],5000),
     {ok,PodDir}=db_pod_desired_state:read(pod_dir,NodelogNode),
     PathLogDir=filename:join(PodDir,?LogDir),
@@ -168,23 +168,36 @@ start_infra_appls(ClusterSpec)->
     PathLogFile=filename:join([PathLogDir,?LogFileName]),
     ok=rpc:call(NodelogNode,nodelog,config,[PathLogFile],5000),
     true=rpc:call(NodelogNode,nodelog,is_config,[],5000),
+    true=lists:keymember(nodelog,3,ActiveApplsInfoList_2),
 
-    [{InfraServiceNode,InfraServiceApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoList,
+    %% infra_service -----------------------------------------------------------
+
+    StoppedInfraService=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+					   infra_service==App],
+    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedInfraService,[])],
+ %   ok=application:stop(db_etcd),
+ %    ok=application:stop(infra_service),
+
+    {ok,ActiveApplsInfoList_3}=appl_server:active_appls(),
+    [{InfraServiceNode,InfraServiceApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoList_3,
 					  infra_service==App],
 
     
     R1=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
     io:format("R1 ~p~n",[{R1,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
-    R2=rpc:call(InfraServiceNode,InfraServiceApp,config,[ClusterSpec],5000),
-    io:format("R2 ~p~n",[{R2,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
-    R3=rpc:call(DbEtcdNode,DbEtcdApp,is_config,[],5000),
-    io:format("R3 ~p~n",[{R3,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
-    
- %   false= rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
-  %  ok=rpc:call(InfraServiceNode,InfraServiceApp,config,[ClusterSpec],5000),
-  %  true=rpc:call(DbEtcdNode,DbEtcdApp,is_config,[],5000),
-  
+    R11=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
+    io:format("R11 ~p~n",[{R11,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
 
+    R2=rpc:call(InfraServiceNode,InfraServiceApp,config,[ClusterSpec],20*1000),
+    io:format("R2 ~p~n",[{R2,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
+    R3=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
+    io:format("R3 ~p~n",[{R3,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
+   
+    true=lists:keymember(infra_service,3,ActiveApplsInfoList_3),
+    %%%
+
+   % ['4_c200_c201_pod@c200']=sd:get_node(InfraServiceApp),
+  %  glurk=sd:call(InfraServiceApp,InfraServiceApp,ping,[],10*1000),
     ok.
 
 %%--------------------------------------------------------------------
