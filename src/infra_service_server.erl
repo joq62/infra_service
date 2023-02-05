@@ -83,7 +83,7 @@ handle_call({config,ClusterSpec},_From, State) ->
     
     Reply=case State#state.cluster_spec of 
 	      undefined->
-		  case rpc:call(node(),lib_infra_service,init_servers,[ClusterSpec],5*5000) of
+		  case rpc:call(node(),lib_infra_service,init_servers,[ClusterSpec],30*1000) of
 		      {badrpc,Reason}->
 			  NewState=State,
 			  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error when calling init_servers  : ",Reason,?MODULE,?LINE]]),

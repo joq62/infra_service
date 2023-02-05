@@ -188,7 +188,7 @@ start_infra_appls(ClusterSpec)->
     R11=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
     io:format("R11 ~p~n",[{R11,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
 
-    R2=rpc:call(InfraServiceNode,InfraServiceApp,config,[ClusterSpec],20*1000),
+    R2=rpc:call(InfraServiceNode,InfraServiceApp,config,[ClusterSpec],60*1000),
     io:format("R2 ~p~n",[{R2,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
     R3=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
     io:format("R3 ~p~n",[{R3,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),

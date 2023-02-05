@@ -33,18 +33,25 @@
 %% @end
 %%--------------------------------------------------------------------
 init_servers(ClusterSpec)->
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DEBUG config,ClusterSpec  : ",ClusterSpec,?MODULE,?LINE]]),
     Result=case parent_server:load_desired_state(ClusterSpec) of
 	        {error,Reason}->
+		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["parent_server:load_desired_state  : ",Reason,?MODULE,?LINE]]),
 		   {error,Reason};
 	       ok ->
+		   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["parent_server:load_desired_state  : ",ok,?MODULE,?LINE]]),
 		   case pod_server:load_desired_state(ClusterSpec) of
 		       {error,Reason}->
+			   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["pod_server:load_desired_state  : ",Reason,?MODULE,?LINE]]),
 			   {error,Reason};
 		       ok ->
+			   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["pod_server:load_desired_state  : ",ok,?MODULE,?LINE]]),
 			   case appl_server:load_desired_state(ClusterSpec) of
 			       {error,Reason}->
+				   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["appl_server:load_desired_state  : ",Reason,?MODULE,?LINE]]),
 				   {error,Reason};
 			       ok ->
+				   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["appl_server:load_desired_state  : ",ok,?MODULE,?LINE]]),
 				   ok
 			   end
 		   end
