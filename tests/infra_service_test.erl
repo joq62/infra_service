@@ -34,6 +34,7 @@ start([ClusterSpec,_Arg2])->
     
     ok=start_parents_pods(),
     ok=start_infra_appls(ClusterSpec),
+    sd:call(infra_service,infra_service,start_orchistrate,[],5000),
     
 %    ok=desired_test(),
 %    ok=check_appl_status(),
@@ -198,15 +199,8 @@ start_infra_appls(ClusterSpec)->
    
     {ok,ActiveApplsInfoList_1}=appl_server:active_appls(),
 
-    [{DbEtcdNode,DbEtcdApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoList_1,
-					  db_etcd==App],
-
-    false=rpc:call(DbEtcdNode,DbEtcdApp,is_config,[],5000),
-    ok=rpc:call(DbEtcdNode,DbEtcdApp,config,[],5000),
-    true=rpc:call(DbEtcdNode,DbEtcdApp,is_config,[],5000),
-    true=lists:keymember(db_etcd,3,ActiveApplsInfoList_1),
-
-    %%-- nodelog -------------------------------------------------------------
+    
+%%-- nodelog -------------------------------------------------------------
     StoppedNodelog=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
 					    nodelog==App],
     []=[{error,Reason}||{error,Reason}<-create_appl(StoppedNodelog,[])],
@@ -223,36 +217,49 @@ start_infra_appls(ClusterSpec)->
     ok=rpc:call(NodelogNode,nodelog,config,[PathLogFile],5000),
     true=rpc:call(NodelogNode,nodelog,is_config,[],5000),
     true=lists:keymember(nodelog,3,ActiveApplsInfoList_2),
+    %%------------- db_etcd
+    [{DbEtcdNode,DbEtcdApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoList_1,
+					  db_etcd==App],
+
+    false=rpc:call(DbEtcdNode,DbEtcdApp,is_config,[],5000),
+    ok=rpc:call(DbEtcdNode,DbEtcdApp,config,[],5000),
+    true=rpc:call(DbEtcdNode,DbEtcdApp,is_config,[],5000),
+    true=lists:keymember(db_etcd,3,ActiveApplsInfoList_1),
+       
+    
 
     %% infra_service -----------------------------------------------------------
 
     StoppedInfraService=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
 					   infra_service==App],
     []=[{error,Reason}||{error,Reason}<-create_appl(StoppedInfraService,[])],
- %   ok=application:stop(db_etcd),
- %    ok=application:stop(infra_service),
-
+ 
     {ok,ActiveApplsInfoList_3}=appl_server:active_appls(),
     [{InfraServiceNode,InfraServiceApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoList_3,
 					  infra_service==App],
 
-    
+    DbEtcd1=sd:get_node(db_etcd),
+    io:format("DbEtcd1 ~p~n",[{DbEtcd1,?MODULE,?FUNCTION_NAME}]),
+    ok=application:stop(db_etcd),
+    DbEtcd2=sd:get_node(db_etcd),
+    io:format("DbEtcd2 ~p~n",[{DbEtcd2,?MODULE,?FUNCTION_NAME}]),
+
     R1=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
     io:format("R1 ~p~n",[{R1,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
     R11=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
     io:format("R11 ~p~n",[{R11,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
 
-    R2=rpc:call(InfraServiceNode,InfraServiceApp,config,[ClusterSpec],2*60*1000),
-    io:format("R2 ~p~n",[{R2,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
-    R3=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
-    io:format("R3 ~p~n",[{R3,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
-   
+    ParentDS=sd:call(db_etcd,db_parent_desired_state,get_all_id,[],5000),
+    io:format("ParentDS ~p~n",[{ParentDS,?MODULE,?FUNCTION_NAME,?LINE}]),
+    PodDS=sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000),
+    io:format("PodDS ~p~n",[{PodDS,?MODULE,?FUNCTION_NAME,?LINE}]),
+    ApplDS=sd:call(db_etcd,db_appl_desired_state,get_all_id,[],5000),
+    io:format("ApplDS ~p~n",[{ApplDS,?MODULE,?FUNCTION_NAME,?LINE}]),
+      
     true=lists:keymember(infra_service,3,ActiveApplsInfoList_3),
     %%%
-
-   % ['4_c200_c201_pod@c200']=sd:get_node(InfraServiceApp),
-  %  glurk=sd:call(InfraServiceApp,InfraServiceApp,ping,[],10*1000),
-    ok.
+      
+     ok.
 
 %%--------------------------------------------------------------------
 %% @doc
