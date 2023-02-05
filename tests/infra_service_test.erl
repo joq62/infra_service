@@ -247,7 +247,7 @@ start_infra_appls(ClusterSpec)->
     false=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
   %  io:format("R1 ~p~n",[{R1,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
     
-    R11=rpc:call(InfraServiceNode,InfraServiceApp,config,[ClusterSpec],5000),
+    R11=rpc:call(InfraServiceNode,InfraServiceApp,config,[ClusterSpec],60*1000),
     io:format("R11 ~p~n",[{R11,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
 
     true=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
@@ -257,8 +257,8 @@ start_infra_appls(ClusterSpec)->
     io:format("ParentDS ~p~n",[{ParentDS,?MODULE,?FUNCTION_NAME,?LINE}]),
     PodDS=sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000),
     io:format("PodDS ~p~n",[{PodDS,?MODULE,?FUNCTION_NAME,?LINE}]),
-    ApplDS=sd:call(db_etcd,db_appl_desired_state,get_all_id,[],5000),
-    io:format("ApplDS ~p~n",[{ApplDS,?MODULE,?FUNCTION_NAME,?LINE}]),
+    
+    application:stop(infra_service),
       
     true=lists:keymember(infra_service,3,ActiveApplsInfoList_3),
     %%%

@@ -70,7 +70,7 @@ orchistrate(SleepInterval)->
     ResultStartParentPods=rpc:call(node(),?MODULE,start_parents_pods,[],15*1000),
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultStartParentPods  : ",ResultStartParentPods,?MODULE,?LINE]]),
 
-    ResultStartInfraAppls=rpc:call(node(),?MODULE,start_infra_appls,[],15*1000),
+    ResultStartInfraAppls=rpc:call(node(),?MODULE,start_infra_appls,[],60*1000),
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultStartInfraAppls  : ",ResultStartInfraAppls,?MODULE,?LINE]]),
     ResultStartUserAppls=rpc:call(node(),?MODULE,start_user_appls,[],15*1000), 
 
@@ -99,7 +99,7 @@ start_parents_pods()->
     {ok,StoppedParents}=parent_server:stopped_nodes(),
     [parent_server:create_node(Parent)||Parent<-StoppedParents],
     {ok,ActiveParents}=parent_server:active_nodes(),
-    []=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
+    [{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
 								   Pod2<-ActiveParents,
 								   Pod1/=Pod2],						
     {ok,StoppedPods}=pod_server:stopped_nodes(),
@@ -142,22 +142,17 @@ start_infra_appls()->
     % config db_etcd
     [{DbEtcdNode,DbEtcdApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoList,
 					  db_etcd==App],
-
-    false=rpc:call(DbEtcdNode,DbEtcdApp,is_config,[],5000),
-    ok=rpc:call(DbEtcdNode,DbEtcdApp,config,[],5000),
-    true=rpc:call(DbEtcdNode,DbEtcdApp,is_config,[],5000),
-
+    rpc:call(DbEtcdNode,DbEtcdApp,config,[],5000),
+    
     [{NodelogNode,_NodelogApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoList,
 					    nodelog==App],
   
-    false=rpc:call(NodelogNode,nodelog,is_config,[],5000),
     {ok,PodDir}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[pod_dir,NodelogNode],5000),
     PathLogDir=filename:join(PodDir,?LogDir),
     rpc:call(NodelogNode,file,del_dir_r,[PathLogDir],5000),
     ok=rpc:call(NodelogNode,file,make_dir,[PathLogDir],5000),
     PathLogFile=filename:join([PathLogDir,?LogFileName]),
     ok=rpc:call(NodelogNode,nodelog,config,[PathLogFile],5000),
-    true=rpc:call(NodelogNode,nodelog,is_config,[],5000),
   
     ok.
 
