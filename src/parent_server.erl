@@ -117,27 +117,16 @@ init([]) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
 handle_call({load_desired_state,ClusterSpec},_From, State) ->
-    Reply=case State#state.cluster_spec of
-	      undefined->
-		  ok=sd:call(db_etcd,db_parent_desired_state,create_table,[],5000),
-		  case lib_parent:load_desired_state(ClusterSpec) of
-		      ok->
-			  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK: initiation of desired state : ",ClusterSpec]]),
-			  NewState=State#state{cluster_spec=ClusterSpec},
-			  ok;
-		      {error,ErrorList}->
-			  NewState=State,
-			  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR:  when intite desired state : ",ErrorList]]),
-			  {error,ErrorList}
-		  end;
-	      ClusterSpec->
+    sd:call(db_etcd,db_parent_desired_state,create_table,[],5000),
+    Reply=case lib_parent:load_desired_state(ClusterSpec) of
+	      ok->
+		  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK: initiation of desired state : ",ClusterSpec]]),
+		  NewState=State#state{cluster_spec=ClusterSpec},
+		  ok;
+	      {error,ErrorList}->
 		  NewState=State,
-		  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: Already initiated : ",ClusterSpec]]),
-		  {error,["Already initiated : ",ClusterSpec]};
-	      AnotherCluster->
-		  NewState=State,
-		  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: Already initiated : ",AnotherCluster]]),
-		  {error,["Already initiated : ",AnotherCluster]}
+		  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR:  when intite desired state : ",ErrorList]]),
+		  {error,ErrorList}
 	  end,
     {reply, Reply, NewState};
 

@@ -57,7 +57,10 @@ start([ClusterSpec,HostSpec])->
     application:stop(db_etcd),
     [DbPod]=sd:get_node(db_etcd),
     io:format("DbPod ~p~n",[{DbPod,?MODULE,?FUNCTION_NAME,?LINE}]),
-  
+    %%- Initiate db_etcd with desired_State !!
+    
+    glurk=parent_server:load_desired_state(ClusterSpec),
+    ok=pod_server:load_desired_state(ClusterSpec),
 
     %%-- create db_etcd
     [{ok,InfraPod,InfraApplSpec}]=lib_infra_service:create_pods_based_appl("infra_service"),
