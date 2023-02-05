@@ -165,6 +165,7 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({load_desired_state,ClusterSpec},_From, State) ->
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["load_desired_state,ClusterSpec : ",ClusterSpec]]),
     Reply=case State#state.cluster_spec of
 	      undefined->
 		  ok=sd:call(db_etcd,db_pod_desired_state,create_table,[],5000),
