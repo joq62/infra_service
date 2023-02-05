@@ -193,7 +193,7 @@ prioritize([PodNode|T],Acc) ->
 load_desired_state(ClusterSpec)->
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["load_desired_state : ",ClusterSpec,?MODULE,?LINE]]),
     {ok,PodsHostList}=sd:call(db_etcd,db_cluster_spec,read,[pods,ClusterSpec],5000),
-    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["PodsHostList : ",PodsHostList,?MODULE,?LINE]]),
+    
   %  io:format("PodsHostList ~p~n",[{PodsHostList,?MODULE,?FUNCTION_NAME,?LINE}]),
     HostSpecList=[HostSpec||{_Num,HostSpec}<-PodsHostList],
     AllDeploymentId=sd:call(db_etcd,db_appl_deployment,get_all_id,[],5000),
@@ -207,13 +207,16 @@ load_desired_state(ClusterSpec)->
 main_load_desired_state([],_HostSpecList,Acc)->
     Acc;
 main_load_desired_state([ApplDeploymentSpec|T],HostSpecList,Acc) ->
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,[" : ",?MODULE,?LINE]]),
     Result=load_desired_state(ApplDeploymentSpec,HostSpecList,[]),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Result : ",Result,?MODULE,?LINE]]),
     main_load_desired_state(T,HostSpecList,[Result|Acc]).
 
 %%-- Affinity on each pod each_pod
 load_desired_state({_SpecId,_ApplSpec,_Vsn,_ClusterSpec,_,each_pod},[],Acc)->
     Acc;
 load_desired_state({SpecId,ApplSpec,_Vsn,ClusterSpec,1,each_pod},[HostSpec|T],Acc)->
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ApplSpec : ",ApplSpec,?MODULE,?LINE]]),
     RightHost=[PodNode||PodNode<-sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000),
 			{ok,HostSpec}==sd:call(db_etcd,db_pod_desired_state,read,[host_spec,PodNode],5000)],
     NodeApplSpecList=[{PodNode,sd:call(db_etcd,db_pod_desired_state,read,[appl_spec_list,PodNode],5000)}||PodNode<-RightHost],
@@ -232,6 +235,7 @@ load_desired_state({SpecId,ApplSpec,_Vsn,ClusterSpec,1,each_pod},[HostSpec|T],Ac
 load_desired_state({_SpecId,_ApplSpec,_Vsn,_ClusterSpec,0,any_host},_HostList,Acc)->
     Acc;
 load_desired_state({SpecId,ApplSpec,_Vsn,ClusterSpec,N,any_host},[HostSpec|T],Acc)->
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ApplSpec : ",ApplSpec,?MODULE,?LINE]]),
   %  io:format("ApplSpec,WantedHostSpec ~p~n",[{ApplSpec,HostSpec,?MODULE,?FUNCTION_NAME}]),
     Result=case get_candidate_pods(SpecId,HostSpec,ClusterSpec) of
 	       []->
