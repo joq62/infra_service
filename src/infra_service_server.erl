@@ -127,7 +127,7 @@ handle_call(Request, From, State) ->
 
 
 handle_cast({start_orchistrate}, State) ->
-    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Start  : ",?MODULE,?LINE]]),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["  : ",?MODULE,?LINE,?FUNCTION_NAME]]),
     rpc:cast(node(),lib_infra_service,orchistrate,[]),
     {noreply, State};
 

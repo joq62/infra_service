@@ -244,10 +244,14 @@ start_infra_appls(ClusterSpec)->
     DbEtcd2=sd:get_node(db_etcd),
     io:format("DbEtcd2 ~p~n",[{DbEtcd2,?MODULE,?FUNCTION_NAME}]),
 
-    R1=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
-    io:format("R1 ~p~n",[{R1,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
-    R11=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
+    false=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
+  %  io:format("R1 ~p~n",[{R1,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
+    
+    R11=rpc:call(InfraServiceNode,InfraServiceApp,config,[ClusterSpec],5000),
     io:format("R11 ~p~n",[{R11,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
+
+    true=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
+  %  io:format("R12 ~p~n",[{R12,InfraServiceNode,InfraServiceApp,?MODULE,?FUNCTION_NAME}]),
 
     ParentDS=sd:call(db_etcd,db_parent_desired_state,get_all_id,[],5000),
     io:format("ParentDS ~p~n",[{ParentDS,?MODULE,?FUNCTION_NAME,?LINE}]),
