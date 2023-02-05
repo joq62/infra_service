@@ -14,11 +14,13 @@
 -define(SleepInterval,20*1000).
 %% API
 -export([
+	 create_infra_appl/1,
+	 create_pods_based_appl/1,
 	 init_servers/1,
 	 ensure_right_cookie/1,
 	 orchistrate/0,
 	 orchistrate/1,
-	 start_parents_pods/0,
+	 start_parents/0,
 	 start_infra_appls/0,
 	 start_user_appls/0 
 	]).
@@ -33,25 +35,32 @@
 %% @end
 %%--------------------------------------------------------------------
 init_servers(ClusterSpec)->
-    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DEBUG config,ClusterSpec  : ",ClusterSpec,?MODULE,?LINE]]),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,
+				 ["DEBUG config,ClusterSpec  : ",ClusterSpec,?MODULE,?LINE]]),
     Result=case parent_server:load_desired_state(ClusterSpec) of
 	        {error,Reason}->
-		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["parent_server:load_desired_state  : ",Reason,?MODULE,?LINE]]),
+		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,
+						["parent_server:load_desired_state  : ",Reason,?MODULE,?LINE]]),
 		   {error,Reason};
 	       ok ->
-		   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["parent_server:load_desired_state  : ",ok,?MODULE,?LINE]]),
+		   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,
+						["parent_server:load_desired_state  : ",ok,?MODULE,?LINE]]),
 		   case pod_server:load_desired_state(ClusterSpec) of
 		       {error,Reason}->
-			   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["pod_server:load_desired_state  : ",Reason,?MODULE,?LINE]]),
+			   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,
+							["pod_server:load_desired_state  : ",Reason,?MODULE,?LINE]]),
 			   {error,Reason};
 		       ok ->
-			   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["pod_server:load_desired_state  : ",ok,?MODULE,?LINE]]),
+			   sd:cast(nodelog,nodelog,log,
+				   [notice,?MODULE_STRING,?LINE,["pod_server:load_desired_state  : ",ok,?MODULE,?LINE]]),
 			   case appl_server:load_desired_state(ClusterSpec) of
 			       {error,Reason}->
-				   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["appl_server:load_desired_state  : ",Reason,?MODULE,?LINE]]),
+				   sd:cast(nodelog,nodelog,log,
+					   [warning,?MODULE_STRING,?LINE,["appl_server:load_desired_state  : ",Reason,?MODULE,?LINE]]),
 				   {error,Reason};
 			       ok ->
-				   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["appl_server:load_desired_state  : ",ok,?MODULE,?LINE]]),
+				   sd:cast(nodelog,nodelog,log,
+					   [notice,?MODULE_STRING,?LINE,["appl_server:load_desired_state  : ",ok,?MODULE,?LINE]]),
 				   ok
 			   end
 		   end
@@ -88,51 +97,53 @@ orchistrate(SleepInterval)->
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-
-
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-start_parents_pods()->
+start_parents()->
     {ok,StoppedParents}=parent_server:stopped_nodes(),
     [parent_server:create_node(Parent)||Parent<-StoppedParents],
     {ok,ActiveParents}=parent_server:active_nodes(),
     _R1=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
 								   Pod2<-ActiveParents,
 								   Pod1/=Pod2],						
-    {ok,StoppedPods}=pod_server:stopped_nodes(),
-    [create_pod(Pod)||Pod<-StoppedPods],
-    [rpc:call(Pod1,net_adm,ping,[Pod2],5000)||Pod1<-ActiveParents,
-					      Pod2<-StoppedPods,
-					      Pod1/=Pod2],
-    {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),
-    StoppedPod=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-					   pod==App],
-    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedPod,[])],
-    
-  
-    ok.
+   ok.
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-start_infra_appls()->
-   
+start_infra_appls()->   
     {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),    
-    
     R_Nodelog=[create_infra_appl({PodNode,ApplSpec,App})||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-							       nodelog==App],
-
+							  nodelog==App],
     R_db_etcd=[create_infra_appl({PodNode,ApplSpec,App})||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
 							  db_etcd==App],
-
     R_infra_service=[create_infra_appl({PodNode,ApplSpec,App})||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-							  infra_service==App],
-
+								infra_service==App],
     [{nodelog,R_Nodelog},{db_etcd,R_db_etcd},{infra_service,R_infra_service}].
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+create_pods_based_appl(ApplSpec)->
+    AllPodsApplSpecsToStart=[{PodNode,db_pod_desired_state:read(appl_spec_list,PodNode)}||PodNode<-db_pod_desired_state:get_all_id(),
+											  pang==net_adm:ping(PodNode)],
+    
+    PodsToStart=[PodNode||{PodNode,{ok,{_,ApplSpec,_}}}<-AllPodsApplSpecsToStart],
+    [create_pod(PodNode)||PodNode<-PodsToStart].
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+create_pod(PodNode)->
+    {ok,ParentNode}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[parent_node,PodNode],5000),
+    {ok,NodeName}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[node_name,PodNode],5000),
+    {ok,PodDir}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[pod_dir,PodNode],5000),
+    {ok,PaArgsList}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[pa_args_list,PodNode],5000),
+    {ok,EnvArgs}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[env_args,PodNode],5000),
+    pod_server:create_pod(ParentNode,NodeName,PodDir,PaArgsList,EnvArgs).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -224,19 +235,7 @@ ensure_right_cookie(ClusterSpec)->
     
     ok.
 
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
 
-create_pod(PodNode)->
-    {ok,ParentNode}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[parent_node,PodNode],5000),
-    {ok,NodeName}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[node_name,PodNode],5000),
-    {ok,PodDir}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[pod_dir,PodNode],5000),
-    {ok,PaArgsList}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[pa_args_list,PodNode],5000),
-    {ok,EnvArgs}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[env_args,PodNode],5000),
-    pod_server:create_pod(ParentNode,NodeName,PodDir,PaArgsList,EnvArgs).
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec

@@ -12,6 +12,9 @@
 -module(infra_service_test).      
  
 -export([start/1]).
+
+-compile(export_all).
+
 %% --------------------------------------------------------------------
 %% Include files
 %% --------------------------------------------------------------------
@@ -32,7 +35,7 @@ start([ClusterSpec,_Arg2])->
 %    {ok,ActiveParents}=start_parents(),
 %    io:format("ActiveParents !!! ~p~n",[{ActiveParents,?MODULE,?FUNCTION_NAME}]),
     
-    ok=start_parents_pods(),
+    ok=start_parents(),
     ok=start_infra_appls(ClusterSpec),
     sd:call(infra_service,infra_service,start_orchistrate,[],5000),
     
@@ -177,8 +180,6 @@ start_pod_appl(ClusterSpec,AppToStart)->
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-
-
 start_infra_appls(ClusterSpec)->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
@@ -265,46 +266,6 @@ start_infra_appls(ClusterSpec)->
       
      ok.
 
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-start_parents_pods()->
-    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-
-    % just for testing 
-    [rpc:call(Pod,init,stop,[],5000)||Pod<-db_parent_desired_state:get_all_id()],
-    timer:sleep(2000),
-    [rpc:call(Pod,init,stop,[],5000)||Pod<-db_pod_desired_state:get_all_id()],
-    timer:sleep(1000),
-    
-    % Code to be used 
-    
-    {ok,StoppedParents}=parent_server:stopped_nodes(),
-    [parent_server:create_node(Parent)||Parent<-StoppedParents],
-    {ok,ActiveParents}=parent_server:active_nodes(),
-    [{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
-								   Pod2<-ActiveParents,
-								   Pod1/=Pod2],
-						
-    {ok,StoppedPods}=pod_server:stopped_nodes(),
-    [create_pod(Pod)||Pod<-StoppedPods],
-    [rpc:call(Pod1,net_adm,ping,[Pod2],5000)||Pod1<-ActiveParents,
-					      Pod2<-StoppedPods,
-					      Pod1/=Pod2],
-
-    {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),
-    StoppedCommon=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-					   common==App],
-    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedCommon,[])],
-    StoppedResourceDiscovery=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-						      sd==App],
-    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedResourceDiscovery,[])],
-    % Check if all started 
-    {ok,[]}=parent_server:stopped_nodes(),
-    {ok,[]}=pod_server:stopped_nodes(),
-    ok.
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
@@ -445,111 +406,6 @@ create_pod(PodNode)->
     {ok,PaArgsList}=db_pod_desired_state:read(pa_args_list,PodNode),
     {ok,EnvArgs}=db_pod_desired_state:read(env_args,PodNode),
     pod_server:create_pod(ParentNode,NodeName,PodDir,PaArgsList,EnvArgs).
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-check_appl_status()->
-    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-
-    [rpc:call(Pod,init,stop,[],5000)||Pod<-db_parent_desired_state:get_all_id()],
-    timer:sleep(2000),
-    [rpc:call(Pod,init,stop,[],5000)||Pod<-db_pod_desired_state:get_all_id()],
-    timer:sleep(1000),
-
-
-    {ok,StoppedApplsInfo}=lib_appl:stopped_appls(),
-    [
-     {'1_c200_c201_pod@c200',"common",common},
-     {'1_c200_c201_pod@c200',"resource_discovery",resource_discovery},
-     {'1_c200_c201_pod@c201',"common",common},
-     {'1_c200_c201_pod@c201',"resource_discovery",resource_discovery},
-     {'2_c200_c201_pod@c200',"common",common},
-     {'2_c200_c201_pod@c200',"resource_discovery",resource_discovery},
-     {'2_c200_c201_pod@c201',"common",common},
-     {'2_c200_c201_pod@c201',"resource_discovery",resource_discovery},
-     {'3_c200_c201_pod@c200',"common",common},
-     {'3_c200_c201_pod@c200',"math",math},
-     {'3_c200_c201_pod@c200',"resource_discovery",resource_discovery},
-     {'3_c200_c201_pod@c201',"common",common},
-     {'3_c200_c201_pod@c201',"math",math},
-     {'3_c200_c201_pod@c201',"resource_discovery",resource_discovery},
-     {'4_c200_c201_pod@c200',"common",common},
-     {'4_c200_c201_pod@c200',"infra_service",infra_service},
-     {'4_c200_c201_pod@c200',"resource_discovery",resource_discovery},
-     {'4_c200_c201_pod@c201',"common",common},
-     {'4_c200_c201_pod@c201',"hw_conbee",hw_conbee_app},
-     {'4_c200_c201_pod@c201',"resource_discovery",resource_discovery},
-     {'5_c200_c201_pod@c200',"common",common},
-     {'5_c200_c201_pod@c200',"resource_discovery",resource_discovery},
-     {'5_c200_c201_pod@c201',"common",common},
-     {'5_c200_c201_pod@c201',"resource_discovery",resource_discovery},
-     {'6_c200_c201_pod@c200',"common",common},
-     {'6_c200_c201_pod@c200',"resource_discovery",resource_discovery},
-     {'6_c200_c201_pod@c201',"common",common},
-     {'6_c200_c201_pod@c201',"resource_discovery",resource_discovery}
-    ]=lists:sort(StoppedApplsInfo),
-
-    {ok,[]}=lib_appl:active_appls(),
-
-    ok.
-
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-desired_test()->
-    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-
-    [
-     {'c200_c201_parent@c201',"c200_c201_parent","c200_c201","c201"," -pa c200_c201 "," -pa c200_c201/*/ebin"," "},
-     {'c200_c201_parent@c200',"c200_c201_parent","c200_c201","c200"," -pa c200_c201 "," -pa c200_c201/*/ebin"," "}
-    ]=db_parent_desired_state:read_all(),
-    
-    
-    [
-     {'1_c200_c201_pod@c200',"1_c200_c201_pod","c200_c201/1_c200_c201_pod",'c200_c201_parent@c200',["common","resource_discovery"],"c200_c201","c200",[]," "},
-     {'1_c200_c201_pod@c201',"1_c200_c201_pod","c200_c201/1_c200_c201_pod",'c200_c201_parent@c201',["common","resource_discovery"],"c200_c201","c201",[]," "},
-     {'2_c200_c201_pod@c200',"2_c200_c201_pod","c200_c201/2_c200_c201_pod",'c200_c201_parent@c200',["common","resource_discovery"],"c200_c201","c200",[]," "},
-     {'2_c200_c201_pod@c201',"2_c200_c201_pod","c200_c201/2_c200_c201_pod",'c200_c201_parent@c201',["common","resource_discovery"],"c200_c201","c201",[]," "},
-     {'3_c200_c201_pod@c200',"3_c200_c201_pod","c200_c201/3_c200_c201_pod",'c200_c201_parent@c200',["common","resource_discovery","math"],"c200_c201","c200",[]," "},
-     {'3_c200_c201_pod@c201',"3_c200_c201_pod","c200_c201/3_c200_c201_pod",'c200_c201_parent@c201',["common","resource_discovery","math"],"c200_c201","c201",[]," "},
-     {'4_c200_c201_pod@c200',"4_c200_c201_pod","c200_c201/4_c200_c201_pod",'c200_c201_parent@c200',["common","infra_service","resource_discovery"],"c200_c201","c200",[]," "},
-     {'4_c200_c201_pod@c201',"4_c200_c201_pod","c200_c201/4_c200_c201_pod",'c200_c201_parent@c201',["hw_conbee","common","resource_discovery"],"c200_c201","c201",[]," "},
-     {'5_c200_c201_pod@c200',"5_c200_c201_pod","c200_c201/5_c200_c201_pod",'c200_c201_parent@c200',["common","resource_discovery"],"c200_c201","c200",[]," "},{'5_c200_c201_pod@c201',"5_c200_c201_pod","c200_c201/5_c200_c201_pod",'c200_c201_parent@c201',["common","resource_discovery"],"c200_c201","c201",[]," "},
-     {'6_c200_c201_pod@c200',"6_c200_c201_pod","c200_c201/6_c200_c201_pod",'c200_c201_parent@c200',["common","resource_discovery"],"c200_c201","c200",[]," "},{'6_c200_c201_pod@c201',"6_c200_c201_pod","c200_c201/6_c200_c201_pod",'c200_c201_parent@c201',["common","resource_discovery"],"c200_c201","c201",[]," "}
-    ]=lists:sort(db_pod_desired_state:read_all()),
-
-    [
-     '1_c200_c201_pod@c200','1_c200_c201_pod@c201','2_c200_c201_pod@c200',
-     '2_c200_c201_pod@c201','3_c200_c201_pod@c200','3_c200_c201_pod@c201',
-     '4_c200_c201_pod@c200','4_c200_c201_pod@c201','5_c200_c201_pod@c200',
-     '5_c200_c201_pod@c201','6_c200_c201_pod@c200','6_c200_c201_pod@c201'
-    ]=lists:sort(db_pod_desired_state:get_all_id()),
-    
-    AllApplsDesiredState=[{PodNode,db_pod_desired_state:read(appl_spec_list,PodNode)}||PodNode<-lists:sort(db_pod_desired_state:get_all_id()),
-									     {ok,[]}/=db_pod_desired_state:read(appl_spec_list,PodNode)],
-    [
-     {'1_c200_c201_pod@c200',{ok,["common","resource_discovery"]}},{'1_c200_c201_pod@c201',{ok,["common","resource_discovery"]}},
-     {'2_c200_c201_pod@c200',{ok,["common","resource_discovery"]}},{'2_c200_c201_pod@c201',{ok,["common","resource_discovery"]}},
-     {'3_c200_c201_pod@c200',{ok,["common","resource_discovery","math"]}},{'3_c200_c201_pod@c201',{ok,["common","resource_discovery","math"]}},
-     {'4_c200_c201_pod@c200',{ok,["common","infra_service","resource_discovery"]}},
-     {'4_c200_c201_pod@c201',{ok,["hw_conbee","common","resource_discovery"]}},
-     {'5_c200_c201_pod@c200',{ok,["common","resource_discovery"]}},{'5_c200_c201_pod@c201',{ok,["common","resource_discovery"]}},
-     {'6_c200_c201_pod@c200',{ok,["common","resource_discovery"]}},{'6_c200_c201_pod@c201',{ok,["common","resource_discovery"]}}
-    ]=lists:sort(AllApplsDesiredState),
-    
-
-    ok.
-
-
-%% --------------------------------------------------------------------
-%% Function: available_hosts()
-%% Description: Based on hosts.config file checks which hosts are avaible
-%% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
-%% --------------------------------------------------------------------
 
 %% --------------------------------------------------------------------
 %% Function: available_hosts()

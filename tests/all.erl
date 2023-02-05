@@ -33,10 +33,22 @@ start([ClusterSpec,HostSpec])->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
     
     ok=setup(ClusterSpec),
-    ok=infra_service_test:start([ClusterSpec,HostSpec]),
+    ok=infra_service_test:setup(),
+    ok=infra_service_test:start_local_appls(ClusterSpec),
+    ok=infra_service_test:initiate_local_dbase(ClusterSpec),
+    ok=infra_service_test:ensure_right_cookie(ClusterSpec),
+    {ok,ActiveParents}=infra_service_test:start_parents(),
+    io:format("ActiveParents !!! ~p~n",[{ActiveParents,?MODULE,?FUNCTION_NAME}]),
 
-  %  ok=parent_test:start(ClusterSpec,HostSpec),
- %   ok=pod_test:start(ClusterSpec,HostSpec),
+    NodelogPods=lib_infra_service:create_pods_based_appl("nodelog"),
+    io:format("NodelogPods !!! ~p~n",[{NodelogPods,?MODULE,?FUNCTION_NAME}]),
+
+    DbEtcdPods=lib_infra_service:create_pods_based_appl("db_etcd"),
+    io:format("DbEtcdPods !!! ~p~n",[{DbEtcdPods,?MODULE,?FUNCTION_NAME}]),
+
+    InfraServicePods=lib_infra_service:create_pods_based_appl("infra_service"),
+    io:format("InfraServicePods !!! ~p~n",[{InfraServicePods,?MODULE,?FUNCTION_NAME}]),
+    
        
     io:format("Stop OK !!! ~p~n",[{?MODULE,?FUNCTION_NAME}]),
  %   timer:sleep(2000),
