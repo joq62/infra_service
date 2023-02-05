@@ -43,18 +43,18 @@ stop()-> gen_server:call(?SERVER, {stop},infinity).
 
 
 ping() ->
-    gen_server:call(?SERVER, {ping}).
+    gen_server:call(?SERVER, {ping},infinity).
 
 is_config()->
-    gen_server:call(?SERVER, {is_config}).
+    gen_server:call(?SERVER, {is_config},infinity).
 config(ClusterSpec)->
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DEBUG config,ClusterSpec  : ",config,ClusterSpec,?MODULE,?LINE]]),
-    gen_server:call(?SERVER, {config,ClusterSpec}).
+    gen_server:call(?SERVER, {config,ClusterSpec},infinity).
     
 
 orchistrate_result(ResultStartParentPods,ResultStartInfraAppls,ResultStartUserAppls)->
     gen_server:cast(?SERVER,{orchistrate_result,ResultStartParentPods,
-		    ResultStartInfraAppls,ResultStartUserAppls}).    
+		    ResultStartInfraAppls,ResultStartUserAppls},infinity).    
 
 
 %% ====================================================================!
