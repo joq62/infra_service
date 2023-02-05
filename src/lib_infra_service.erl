@@ -153,10 +153,10 @@ create_pod(PodNode)->
 %% @end
 %%--------------------------------------------------------------------
 create_infra_appl({PodNode,ApplSpec,nodelog})->
-    Result= case create_appl({PodNode,ApplSpec,nodelog}) of
+    Result= case create_appl([{PodNode,ApplSpec,nodelog}]) of
 		{error,Reason}->
 		    {error,Reason};
-		ok->
+		[{ok,PodNode,ApplSpec,nodelog}]->
 		    case sd:call(db_etcd,db_pod_desired_state,read,[pod_dir,PodNode],5000) of
 			{badrpc,Reason}->
 			    {error,[badrpc,Reason]};
@@ -183,10 +183,10 @@ create_infra_appl({PodNode,ApplSpec,nodelog})->
     
  
 create_infra_appl({PodNode,ApplSpec,db_etcd}) ->
-    Result= case create_appl({PodNode,ApplSpec,db_etcd},[]) of
+    Result= case create_appl([{PodNode,ApplSpec,db_etcd}]) of
 		{error,Reason}->
 		    {error,Reason};
-		ok->
+		[{ok,PodNode,ApplSpec,db_etcd}]->
 		    case rpc:call(PodNode,db_etcd,config,[],5000) of
 			{Error,Reason}->
 			    {Error,Reason};
@@ -196,10 +196,10 @@ create_infra_appl({PodNode,ApplSpec,db_etcd}) ->
 	    end,
     Result;
 create_infra_appl({PodNode,ApplSpec,infra_service}) ->
-    Result= case create_appl({PodNode,ApplSpec,infra_service},[]) of
+    Result= case create_appl([{PodNode,ApplSpec,infra_service}]) of
 		{error,Reason}->
 		    {error,Reason};
-		ok->
+		[{ok,PodNode,ApplSpec,infra_service}]->
 		    case rpc:call(PodNode,infra_service,config,[],5000) of
 			{Error,Reason}->
 			    {Error,Reason};
