@@ -191,12 +191,15 @@ prioritize([PodNode|T],Acc) ->
 %% @end
 %%--------------------------------------------------------------------
 load_desired_state(ClusterSpec)->
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["load_desired_state : ",ClusterSpec,?MODULE,?LINE]]),
     {ok,PodsHostList}=sd:call(db_etcd,db_cluster_spec,read,[pods,ClusterSpec],5000),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["PodsHostList : ",PodsHostList,?MODULE,?LINE]]),
   %  io:format("PodsHostList ~p~n",[{PodsHostList,?MODULE,?FUNCTION_NAME,?LINE}]),
     HostSpecList=[HostSpec||{_Num,HostSpec}<-PodsHostList],
     AllDeploymentId=sd:call(db_etcd,db_appl_deployment,get_all_id,[],5000),
     ApplDeploymentSpecInfoList=[sd:call(db_etcd,db_appl_deployment,read,[ApplDeploymentId],5000)||ApplDeploymentId<-AllDeploymentId,
 			       {ok,ClusterSpec}==sd:call(db_etcd,db_appl_deployment,read,[cluster_spec,ApplDeploymentId],5000)],
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ApplDeploymentSpecInfoList : ",ApplDeploymentSpecInfoList,?MODULE,?LINE]]),
     _Result=main_load_desired_state(ApplDeploymentSpecInfoList,HostSpecList,[]),
  %   io:format("Result ~p~n",[{Result,?MODULE,?FUNCTION_NAME,?LINE}]).
     ok.
