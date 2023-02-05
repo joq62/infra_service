@@ -151,7 +151,7 @@ start_infra_appls()->
 					    nodelog==App],
   
     false=rpc:call(NodelogNode,nodelog,is_config,[],5000),
-    {ok,PodDir}=db_pod_desired_state:read(pod_dir,NodelogNode),
+    {ok,PodDir}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[pod_dir,NodelogNode],5000),
     PathLogDir=filename:join(PodDir,?LogDir),
     rpc:call(NodelogNode,file,del_dir_r,[PathLogDir],5000),
     ok=rpc:call(NodelogNode,file,make_dir,[PathLogDir],5000),
@@ -184,7 +184,7 @@ start_user_appls()->
 %% @end
 %%--------------------------------------------------------------------
 ensure_right_cookie(ClusterSpec)->
-    {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
+    {ok,Cookie}=sd:call(db_etcd,db_cluster_spec,read,[cookie,ClusterSpec],5000),
     erlang:set_cookie(node(),list_to_atom(Cookie)),
     
     ok.
@@ -196,11 +196,11 @@ ensure_right_cookie(ClusterSpec)->
 %%--------------------------------------------------------------------
 
 create_pod(PodNode)->
-    {ok,ParentNode}=db_pod_desired_state:read(parent_node,PodNode),
-    {ok,NodeName}=db_pod_desired_state:read(node_name,PodNode),
-    {ok,PodDir}=db_pod_desired_state:read(pod_dir,PodNode),
-    {ok,PaArgsList}=db_pod_desired_state:read(pa_args_list,PodNode),
-    {ok,EnvArgs}=db_pod_desired_state:read(env_args,PodNode),
+    {ok,ParentNode}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[parent_node,PodNode],5000),
+    {ok,NodeName}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[node_name,PodNode],5000),
+    {ok,PodDir}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[pod_dir,PodNode],5000),
+    {ok,PaArgsList}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[pa_args_list,PodNode],5000),
+    {ok,EnvArgs}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[env_args,PodNode],5000),
     pod_server:create_pod(ParentNode,NodeName,PodDir,PaArgsList,EnvArgs).
 %%--------------------------------------------------------------------
 %% @doc
