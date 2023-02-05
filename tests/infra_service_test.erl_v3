@@ -15,8 +15,7 @@
 %% --------------------------------------------------------------------
 %% Include files
 %% --------------------------------------------------------------------
--define(LogDir,"log_dir").
--define(LogFileName,"file.logs").
+
 %% --------------------------------------------------------------------
 %% Function: available_hosts()
 %% Description: Based on hosts.config file checks which hosts are avaible
@@ -29,11 +28,11 @@ start([ClusterSpec,_Arg2])->
     ok=start_local_appls(ClusterSpec),
     ok=initiate_local_dbase(ClusterSpec),
     ok=ensure_right_cookie(ClusterSpec),
-%    {ok,ActiveParents}=start_parents(),
-%    io:format("ActiveParents !!! ~p~n",[{ActiveParents,?MODULE,?FUNCTION_NAME}]),
+    {ok,ActiveParents}=start_parents(),
+    io:format("ActiveParents !!! ~p~n",[{ActiveParents,?MODULE,?FUNCTION_NAME}]),
     
-    ok=start_parents_pods(),
-    ok=start_infra_appls(ClusterSpec),
+%    ok=start_parents_pods(),
+  %  ok=start_infra_appls(ClusterSpec),
     
 %    ok=desired_test(),
 %    ok=check_appl_status(),
@@ -87,20 +86,6 @@ start_parents()->
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-create_appl([],Acc)->
-    Acc;
-create_appl([{PodNode,ApplSpec,App}|T],Acc)->
-    Result=appl_server:create_appl(ApplSpec,PodNode),
-    io:format("Ping  ~p~n",[{rpc:call(PodNode,App,ping,[],2000),PodNode,ApplSpec,?MODULE,?FUNCTION_NAME,?LINE}]),
-    io:format("Creat Appl Result ~p~n",[{Result,PodNode,ApplSpec,?MODULE,?FUNCTION_NAME,?LINE}]),
-    create_appl(T,[{Result,PodNode,ApplSpec,App}|Acc]).
-    
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -165,18 +150,14 @@ initiate_local_dbase(ClusterSpec)->
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-start_pod_appl(ClusterSpec,AppToStart)->
-    {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),    
-    StoppedAppToStart=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-					    AppToStart==App],
-    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedAppToStart,[])],
-    ok.
+
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-
+-define(LogDir,"log_dir").
+-define(LogFileName,"file.logs").
 
 start_infra_appls(ClusterSpec)->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
@@ -381,6 +362,14 @@ install_appls()->
 
     ok.
 
+create_appl([],Acc)->
+    Acc;
+create_appl([{PodNode,ApplSpec,App}|T],Acc)->
+    Result=appl_server:create_appl(ApplSpec,PodNode),
+    io:format("Ping  ~p~n",[{rpc:call(PodNode,App,ping,[],2000),PodNode,ApplSpec,?MODULE,?FUNCTION_NAME,?LINE}]),
+    io:format("Creat Appl Result ~p~n",[{Result,PodNode,ApplSpec,?MODULE,?FUNCTION_NAME,?LINE}]),
+    create_appl(T,[{Result,PodNode,ApplSpec,App}|Acc]).
+    
 
 %%--------------------------------------------------------------------
 %% @doc

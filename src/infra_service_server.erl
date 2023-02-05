@@ -51,9 +51,7 @@
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
 init([]) -> 
-    R=rpc:call('do_test@c50',all,print,["kuken ~p~n",[{?MODULE,?LINE,node()}]],5000),
-    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,[" R",R,node()]]),
-     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Servere started",node()]]),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Servere started",node()]]),
     {ok, #state{cluster_spec=undefined}}.   
  
 
@@ -126,6 +124,13 @@ handle_call(Request, From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
+
+
+handle_cast({start_orchistrate}, State) ->
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Start  : ",?MODULE,?LINE]]),
+    rpc:cast(node(),lib_infra_service,orchistrate,[]),
+    {noreply, State};
+
 
 handle_cast({orchistrate_result,_ResultStartParentPods,
 	     _ResultStartInfraAppls,_ResultStartUserAppls}, State) ->
