@@ -40,25 +40,28 @@ start([ClusterSpec,HostSpec])->
     %%-- Start parents
     {ok,ActiveParents}=infra_service_test:start_parents(),
     io:format("ActiveParents !!! ~p~n",[{ActiveParents,?MODULE,?FUNCTION_NAME}]),
-    %%-- create pods
-    [{ok,NodelogPod,NodelogApplSpec}]=lib_infra_service:create_pods_based_appl("nodelog"),
-    [{ok,DbPod,DbApplSpec}]=lib_infra_service:create_pods_based_appl("db_etcd"),
-    [{ok,InfraPod,InfraApplSpec}]=lib_infra_service:create_pods_based_appl("infra_service"),
+    %%-- create pods and load appl
+       
     %%-- create nodelog appl
    % glurk=rpc:call(NodelogPod,application,which_applications,[],5000),
+    [{ok,NodelogPod,NodelogApplSpec}]=lib_infra_service:create_pods_based_appl("nodelog"),
     [{ok,_,_,_}]=lib_infra_service:create_appl([{NodelogPod,"common",common}]),
     [{ok,_,_,_}]=lib_infra_service:create_appl([{NodelogPod,"sd",sd}]),
-    [{ok,_,_,_}]=lib_infra_service:create_infra_appl({NodelogPod,"nodelog",nodelog}),
+    ok=lib_infra_service:create_infra_appl({NodelogPod,"nodelog",nodelog}),
     
+    %%-- create db_etcd
+    [{ok,DbPod,DbApplSpec}]=lib_infra_service:create_pods_based_appl("db_etcd"),
+    [{ok,_,_,_}]=lib_infra_service:create_appl([{DbPod,"common",common}]),
+    [{ok,_,_,_}]=lib_infra_service:create_appl([{DbPod,"sd",sd}]),
+    ok=lib_infra_service:create_infra_appl({DbPod,"db_etcd",db_etcd}),
+    application:stop(db_etcd),
+    [DbPod]=sd:get_node(db_etcd),
+    io:format("DbPod ~p~n",[{DbPod,?MODULE,?FUNCTION_NAME,?LINE}]),
+  
+
+    %%-- create db_etcd
+    [{ok,InfraPod,InfraApplSpec}]=lib_infra_service:create_pods_based_appl("infra_service"),
     
-
-    
-
-    %%-- 
-
-
-
-
 
 %    io:format("InfraServicePods !!! ~p~n",[{InfraServicePods,?MODULE,?FUNCTION_NAME}]),
     
