@@ -99,7 +99,7 @@ start_parents_pods()->
     {ok,StoppedParents}=parent_server:stopped_nodes(),
     [parent_server:create_node(Parent)||Parent<-StoppedParents],
     {ok,ActiveParents}=parent_server:active_nodes(),
-    [{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
+    _R1=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
 								   Pod2<-ActiveParents,
 								   Pod1/=Pod2],						
     {ok,StoppedPods}=pod_server:stopped_nodes(),
@@ -120,41 +120,81 @@ start_parents_pods()->
 %% @end
 %%--------------------------------------------------------------------
 start_infra_appls()->
-    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-
+   
     {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),    
-    StoppedNodelog=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-					    nodelog==App],
-    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedNodelog,[])],
     
-    StoppedDbEtcd=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-					   db_etcd==App],
-    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedDbEtcd,[])],
+    R_Nodelog=[create_infra_appl({PodNode,ApplSpec,App})||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+							       nodelog==App],
 
-    StoppedInfraService=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-					   infra_service==App],
-    []=[{error,Reason}||{error,Reason}<-create_appl(StoppedInfraService,[])],
-    {ok,ActiveApplsInfoList}=appl_server:active_appls(),
-    true=lists:keymember(nodelog,3,ActiveApplsInfoList),
-    true=lists:keymember(db_etcd,3,ActiveApplsInfoList),
-    true=lists:keymember(infra_service,3,ActiveApplsInfoList),
+    R_db_etcd=[create_infra_appl({PodNode,ApplSpec,App})||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+							  db_etcd==App],
 
-    % config db_etcd
-    [{DbEtcdNode,DbEtcdApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoList,
-					  db_etcd==App],
-    rpc:call(DbEtcdNode,DbEtcdApp,config,[],5000),
+    R_infra_service=[create_infra_appl({PodNode,ApplSpec,App})||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+							  infra_service==App],
+
+    [{nodelog,R_Nodelog},{db_etcd,R_db_etcd},{infra_service,R_infra_service}].
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+create_infra_appl({PodNode,ApplSpec,nodelog})->
+    Result= case create_appl({PodNode,ApplSpec,nodelog},[]) of
+		{error,Reason}->
+		    {error,Reason};
+		ok->
+		    case sd:call(db_etcd,db_pod_desired_state,read,[pod_dir,PodNode],5000) of
+			{badrpc,Reason}->
+			    {error,[badrpc,Reason]};
+			{error,Reason}->
+			    {error,Reason};
+			{ok,PodDir}->
+			    PathLogDir=filename:join(PodDir,?LogDir),
+			    rpc:call(PodNode,file,del_dir_r,[PathLogDir],5000),
+			    case rpc:call(PodNode,file,make_dir,[PathLogDir],5000) of
+				{Error,Reason}->
+				    {Error,Reason};
+				ok->
+				    PathLogFile=filename:join([PathLogDir,?LogFileName]),
+				    case rpc:call(PodNode,nodelog,config,[PathLogFile],5000) of
+					{Error,Reason}->
+					    {Error,Reason};
+					ok->	
+					    ok
+				    end
+			    end
+		    end
+	    end,
+    Result;
     
-    [{NodelogNode,_NodelogApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoList,
-					    nodelog==App],
-  
-    {ok,PodDir}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[pod_dir,NodelogNode],5000),
-    PathLogDir=filename:join(PodDir,?LogDir),
-    rpc:call(NodelogNode,file,del_dir_r,[PathLogDir],5000),
-    ok=rpc:call(NodelogNode,file,make_dir,[PathLogDir],5000),
-    PathLogFile=filename:join([PathLogDir,?LogFileName]),
-    ok=rpc:call(NodelogNode,nodelog,config,[PathLogFile],5000),
-  
-    ok.
+ 
+create_infra_appl({PodNode,ApplSpec,db_etcd}) ->
+    Result= case create_appl({PodNode,ApplSpec,db_etcd},[]) of
+		{error,Reason}->
+		    {error,Reason};
+		ok->
+		    case rpc:call(PodNode,db_etcd,config,[],5000) of
+			{Error,Reason}->
+			    {Error,Reason};
+			ok->
+			    ok
+		    end
+	    end,
+    Result;
+create_infra_appl({PodNode,ApplSpec,infra_service}) ->
+    Result= case create_appl({PodNode,ApplSpec,infra_service},[]) of
+		{error,Reason}->
+		    {error,Reason};
+		ok->
+		    case rpc:call(PodNode,infra_service,config,[],5000) of
+			{Error,Reason}->
+			    {Error,Reason};
+			ok->
+			    ok
+		    end
+	    end,
+    Result.
 
 %%--------------------------------------------------------------------
 %% @doc
