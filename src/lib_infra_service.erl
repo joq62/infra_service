@@ -126,10 +126,14 @@ start_infra_appls()->
 %% @end
 %%--------------------------------------------------------------------
 create_pods_based_appl(ApplSpec)->
+  %  AllPodsApplSpecs=[{PodNode,db_pod_desired_state:read(appl_spec_list,PodNode)}||PodNode<-db_pod_desired_state:get_all_id()],
+  %  io:format("AllPodsApplSpecs !!! ~p~n",[{AllPodsApplSpecs,?MODULE,?FUNCTION_NAME,?LINE}]),
     AllPodsApplSpecsToStart=[{PodNode,db_pod_desired_state:read(appl_spec_list,PodNode)}||PodNode<-db_pod_desired_state:get_all_id(),
 											  pang==net_adm:ping(PodNode)],
-    
-    PodsToStart=[PodNode||{PodNode,{ok,{_,ApplSpec,_}}}<-AllPodsApplSpecsToStart],
+    io:format("AllPodsApplSpecsToStart !!! ~p~n",[{AllPodsApplSpecsToStart,?MODULE,?FUNCTION_NAME,?LINE}]),
+    PodsToStart=[PodNode||{PodNode,{ok,ApplSpecList}}<-AllPodsApplSpecsToStart,
+			  lists:member(ApplSpec,ApplSpecList)],
+    io:format("PodsToStart ~p~n",[{PodsToStart,?MODULE,?FUNCTION_NAME,?LINE}]),
     [create_pod(PodNode)||PodNode<-PodsToStart].
 
 %%--------------------------------------------------------------------
@@ -138,11 +142,11 @@ create_pods_based_appl(ApplSpec)->
 %% @end
 %%--------------------------------------------------------------------
 create_pod(PodNode)->
-    {ok,ParentNode}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[parent_node,PodNode],5000),
-    {ok,NodeName}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[node_name,PodNode],5000),
-    {ok,PodDir}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[pod_dir,PodNode],5000),
-    {ok,PaArgsList}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[pa_args_list,PodNode],5000),
-    {ok,EnvArgs}=sd:call(db_etcd,db_etcd,db_pod_desired_state,read,[env_args,PodNode],5000),
+    {ok,ParentNode}=sd:call(db_etcd,db_pod_desired_state,read,[parent_node,PodNode],5000),
+    {ok,NodeName}=sd:call(db_etcd,db_pod_desired_state,read,[node_name,PodNode],5000),
+    {ok,PodDir}=sd:call(db_etcd,db_pod_desired_state,read,[pod_dir,PodNode],5000),
+    {ok,PaArgsList}=sd:call(db_etcd,db_pod_desired_state,read,[pa_args_list,PodNode],5000),
+    {ok,EnvArgs}=sd:call(db_etcd,db_pod_desired_state,read,[env_args,PodNode],5000),
     pod_server:create_pod(ParentNode,NodeName,PodDir,PaArgsList,EnvArgs).
 
 %%--------------------------------------------------------------------
