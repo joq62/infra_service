@@ -77,7 +77,7 @@ init_servers(ClusterSpec)->
 orchistrate(ClusterSpec)->
     orchistrate(ClusterSpec,?SleepInterval).
 orchistrate(ClusterSpec,SleepInterval)->
-    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG orchistrate  : ",?MODULE,?LINE]]),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG orchistrate  : ",time(),?MODULE,?LINE]]),
     timer:sleep(SleepInterval),
     ResultStartParents=rpc:call(node(),?MODULE,start_parents,[],15*1000),
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultStartParents  : ",ResultStartParents,?MODULE,?LINE]]),
@@ -162,6 +162,9 @@ start_pods()->
 %%--------------------------------------------------------------------
 start_infra_appls(ClusterSpec)->   
     {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),    
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: StoppedApplInfoLists : ",time(),StoppedApplInfoLists,?MODULE,?LINE]]),
+
+
     R_Nodelog=[{create_infra_appl({PodNode,ApplSpec,App},ClusterSpec),ApplSpec,PodNode}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
 											 nodelog==App],
     [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error starting appl :", Reason,ApplSpec,PodNode,?MODULE,?LINE]])||
