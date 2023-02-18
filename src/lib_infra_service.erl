@@ -111,8 +111,9 @@ start_parents()->
     CreateResult=[{parent_server:create_node(Parent),Parent}||Parent<-StoppedParents],
     [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Creating parent node :", Reason,ParentNode,?MODULE,?LINE]])||
 	{{error,Reason},ParentNode}<-CreateResult],
-    [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Creating parent node :",ParentNode,?MODULE,?LINE]])||
-	{ok,ParentNode}<-CreateResult],
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Creating parent node CreateResult :",CreateResult,?MODULE,?LINE]]),
+%    [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Creating parent node :",ParentNode,?MODULE,?LINE]])||
+%	{ok,ParentNode}<-CreateResult],
     {ok,ActiveParents}=parent_server:active_nodes(),
     _R1=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
 								   Pod2<-ActiveParents,
@@ -147,6 +148,8 @@ start_pods()->
     _R1=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-Active,
 								   Pod2<-Active,
 								   Pod1/=Pod2],	
+
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Creating pod node CreateResult :",CreateResult,?MODULE,?LINE]]),
   %  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: Stopped : ",Stopped,node(),?MODULE,?LINE]]),
   %  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: Active: ",Active,node(),?MODULE,?LINE]]),
     Stopped.
@@ -182,9 +185,9 @@ start_infra_appls(ClusterSpec)->
     
   %  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: StoppedApplInfoLists : ",StoppedApplInfoLists,node(),?MODULE,?LINE]]),
     
-  %  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: R_Nodelog : ",R_Nodelog,node(),?MODULE,?LINE]]),
-  %  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG:  R_db_etcd : ", R_db_etcd,node(),?MODULE,?LINE]]),
-  %  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG:  R_infra_service : ", R_infra_service,node(),?MODULE,?LINE]]),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: R_Nodelog : ",R_Nodelog,node(),?MODULE,?LINE]]),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG:  R_db_etcd : ", R_db_etcd,node(),?MODULE,?LINE]]),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG:  R_infra_service : ", R_infra_service,node(),?MODULE,?LINE]]),
     [{nodelog,R_Nodelog},{db_etcd,R_db_etcd},{infra_service,R_infra_service}].
 
 %%--------------------------------------------------------------------
