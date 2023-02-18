@@ -48,7 +48,9 @@ start([ClusterSpec,HostSpec])->
     [{ok,_,_,_}]=lib_infra_service:create_appl([{NodelogPod,"common",common}]),
     [{ok,_,_,_}]=lib_infra_service:create_appl([{NodelogPod,"sd",sd}]),
     ok=lib_infra_service:create_infra_appl({NodelogPod,"nodelog",nodelog},ClusterSpec),
-    
+    io:format("Phase 1 Running nodes !!! ~p~n",[{running_nodes(NodelogPod),?MODULE,?FUNCTION_NAME}]),
+    io:format("Phase 1 Running apps !!! ~p~n",[{running_apps(NodelogPod),?MODULE,?FUNCTION_NAME}]),
+
     %%-- create db_etcd
     [{ok,DbPod,DbApplSpec}]=lib_infra_service:create_pods_based_appl("db_etcd"),
     [{ok,_,_,_}]=lib_infra_service:create_appl([{DbPod,"common",common}]),
@@ -63,11 +65,15 @@ start([ClusterSpec,HostSpec])->
     ok=pod_server:load_desired_state(ClusterSpec),
     ok=appl_server:load_desired_state(ClusterSpec),
 
+    
     %%-- create infra_service
     [{ok,InfraPod,InfraApplSpec}]=lib_infra_service:create_pods_based_appl("infra_service"),
     [{ok,_,_,_}]=lib_infra_service:create_appl([{InfraPod,"common",common}]),
     [{ok,_,_,_}]=lib_infra_service:create_appl([{InfraPod,"sd",sd}]),
     ok=lib_infra_service:create_infra_appl({InfraPod,"infra_service",infra_service},ClusterSpec),
+    
+    io:format("Phase 3 Running nodes !!! ~p~n",[{running_nodes(NodelogPod),?MODULE,?FUNCTION_NAME}]),
+    io:format("Phase 3 Running apps !!! ~p~n",[{running_apps(NodelogPod),?MODULE,?FUNCTION_NAME}]),
 
     WhichApplications2=[{Node,rpc:call(Node,application,which_applications,[],5000)}||Node<-nodes()],
     io:format("WhichApplications2 !!! ~p~n",[{WhichApplications2,?MODULE,?FUNCTION_NAME,?LINE}]),
@@ -83,8 +89,14 @@ start([ClusterSpec,HostSpec])->
 %% Function: available_hosts()
 %% Description: Based on hosts.config file checks which hosts are avaible
 %% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
-%% --------------------------------------------------------------------
+%% -------------------------------------------------------------------
+running_apps(Node)->
+    Nodes=lists:delete(node(),[Node|rpc:call(Node,erlang,nodes,[],5000)]),
+    [{N,rpc:call(N,application,which_applications,[],5000)}||N<-Nodes].
 
+running_nodes(Node)->
+    
+    lists:delete(node(),[Node|rpc:call(Node,erlang,nodes,[],5000)]).
 
 %% Function: available_hosts()
 %% Description: Based on hosts.config file checks which hosts are avaible

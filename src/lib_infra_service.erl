@@ -201,7 +201,7 @@ create_infra_appl({PodNode,ApplSpec,infra_service},ClusterSpec) ->
 		{error,Reason}->
 		    {error,Reason};
 		[{ok,PodNode,ApplSpec,infra_service}]->
-		    case rpc:call(PodNode,infra_service,config,[ClusterSpec],5000) of
+		    case rpc:call(PodNode,infra_service,config,[ClusterSpec],5*5000) of
 			{Error,Reason}->
 			    {Error,Reason};
 			ok->
