@@ -14,7 +14,8 @@
 %% --------------------------------------------------------------------
 %% Include files
 %% --------------------------------------------------------------------
-
+-define(LocalTypes,[infra_service]).
+-define(TargetTypes,[nodelog]).
 
 %% --------------------------------------------------------------------
 
@@ -75,6 +76,9 @@ handle_call({is_config},_From, State) ->
     {reply, Reply, State};
 
 handle_call({config,ClusterSpec},_From, State) ->
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DEBUG config,ClusterSpec  : ",config,ClusterSpec,?MODULE,?LINE]]),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DEBUG State#state.cluster_spec  : ",State#state.cluster_spec,?MODULE,?LINE]]),
+    
     Reply=case State#state.cluster_spec of 
 	      undefined->
 		  case rpc:call(node(),lib_infra_service,init_servers,[ClusterSpec],2*60*1000) of
@@ -87,7 +91,6 @@ handle_call({config,ClusterSpec},_From, State) ->
 			  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error when calling init_servers  : ",Reason,?MODULE,?LINE]]),
 			  {error,["Error when calling init_servers :",init_servers,?MODULE,?LINE]};
 		      ok->
-			  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK config succeded  : ",ClusterSpec,?MODULE,?LINE]]),
 			  NewState=State#state{cluster_spec=ClusterSpec},
 			  ok
 		  end;
@@ -109,7 +112,6 @@ handle_call({start_orchistrate},_From, State) ->
 			  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error when calling orchistrate  : ",Reason,?MODULE,?LINE]]),
 			  {error,["Error when calling orchistrate :",Reason,?MODULE,?LINE]};
 		      true->
-			  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK start_orchistrate  : ",?MODULE,?LINE]]),
 			  ok
 		  end
 	  end,
@@ -121,7 +123,6 @@ handle_call({ping},_From, State) ->
     {reply, Reply, State};
 
 handle_call(Request, From, State) ->
-    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Unmatched signal  : ",Request,?MODULE,?LINE]]),
     Reply = {unmatched_signal,?MODULE,Request,From},
     {reply, Reply, State}.
 
@@ -132,43 +133,60 @@ handle_call(Request, From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
+
+
+
+
 handle_cast({orchistrate_result,
-	     _ResultStartParents,
-	     _ResultStartPods,
-	     _ResultStartInfraAppls,
-	     _ResultStartUserAppls}, State) ->
+	     ResultStartParents,
+	     ResultStartPods,
+	     ResultStartInfraAppls,
+	     ResultStartUserAppls}, State) ->
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Start result  : ",
+							      ResultStartParents,
+							      ResultStartPods,
+							      ResultStartInfraAppls,
+							      ResultStartUserAppls,?MODULE,?LINE]]),
+
+    
+   % {ok,StoppedParents}=parent_server:stopped_nodes(),
+  %  {ok,StoppedPods}=pod_server:stopped_nodes(),
+  %  {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),
+   
     case parent_server:stopped_nodes() of
 	{error,Reason2}->
-	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error StoppedParents  : ",Reason2,?MODULE,?LINE]]);
+	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["StoppedParents  : ",Reason2,?MODULE,?LINE]]);
 	{ok,[]}->
-	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Parent running : ",?MODULE,?LINE]]);
+	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["StoppedParents  : ",ok,?MODULE,?LINE]]);
 	{ok,StoppedParents}->
-	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error StoppedParents  : ",StoppedParents,?MODULE,?LINE]])
+	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["StoppedParents  : ",StoppedParents,?MODULE,?LINE]])
     end,
 
     case pod_server:stopped_nodes() of
 	{error,Reason1}->
-	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error StoppedPods  : ",Reason1,?MODULE,?LINE]]);
+	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["StoppedPods  : ",Reason1,?MODULE,?LINE]]);
 	{ok,[]}->
-	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Pods running  : ",?MODULE,?LINE]]);
+	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["StoppedPods  : ",ok,?MODULE,?LINE]]);
 	{ok,StoppedPods}->
-	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error StoppedPods  : ",StoppedPods,?MODULE,?LINE]])
+	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["StoppedPods  : ",StoppedPods,?MODULE,?LINE]])
     end,
+
+  
 
     case appl_server:stopped_appls() of
 	{error,Reason3}->
-	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error StoppedApplInfoLists  : ",Reason3,?MODULE,?LINE]]);
+	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["StoppedApplInfoLists  : ",Reason3,?MODULE,?LINE]]);
 	{ok,[]}->
-	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK appls  : ",?MODULE,?LINE]]);
+	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["StoppedApplInfoLists  : ",ok,?MODULE,?LINE]]);
 	{ok,StoppedApplInfoLists}->
-	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error StoppedApplInfoLists  : ",StoppedApplInfoLists,?MODULE,?LINE]])
+	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["StoppedApplInfoLists  : ",StoppedApplInfoLists,?MODULE,?LINE]])
     end,
+    
     
     rpc:cast(node(),lib_infra_service,orchistrate,[State#state.cluster_spec]),
     {noreply, State};
 
 handle_cast(Msg, State) ->
-    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Unmatched signal  : ",Msg,?MODULE,?LINE]]),
     io:format("unmatched match cast ~p~n",[{Msg,?MODULE,?LINE}]),
     {noreply, State}.
 
@@ -180,7 +198,7 @@ handle_cast(Msg, State) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
 handle_info(Info, State) ->
-    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Unmatched signal  : ",Info,?MODULE,?LINE]]),
+    io:format("unmatched match~p~n",[{Info,?MODULE,?LINE}]), 
     {noreply, State}.
 
 %% --------------------------------------------------------------------

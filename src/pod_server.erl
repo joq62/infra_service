@@ -135,7 +135,6 @@ handle_call({load_desired_state,ClusterSpec},_From, State) ->
     sd:call(db_etcd,db_pod_desired_state,create_table,[],5000),
     Reply=case lib_pod:load_desired_state(ClusterSpec) of
 	      ok->
-		  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK: initiation of desired state : ",ClusterSpec]]),
 		  NewState=State#state{cluster_spec=ClusterSpec},
 		  ok;
 	      {error,ErrorList}->
@@ -208,10 +207,8 @@ handle_call({stopped_nodes},_From, State) ->
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-
 handle_call({create_node,PodNode},_From, State) ->
     Reply=lib_pod:create_node(PodNode),
-    io:format("Reply, PodNode ~p~n",[{Reply,PodNode,?MODULE,?LINE}]),
     {reply, Reply, State};
 
 %%--------------------------------------------------------------------
@@ -222,7 +219,6 @@ handle_call({create_node,PodNode},_From, State) ->
 
 handle_call({create_pod,ParentNode,NodeName,Dir,PaArgs,EnvArgs},_From, State) ->
     Reply=lib_pod:create_node(ParentNode,NodeName,Dir,PaArgs,EnvArgs),
-    io:format("Reply, ParentNode,NodeName,Dir,PaArgs,EnvArgs ~p~n",[{Reply,ParentNode,NodeName,Dir,PaArgs,EnvArgs,?MODULE,?LINE}]),
     {reply, Reply, State};
     
 %%--------------------------------------------------------------------
@@ -264,6 +260,7 @@ handle_call({ping},_From, State) ->
     {reply, Reply, State};
 
 handle_call(Request, From, State) ->
+    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Unmatched signal  : ",Request,?MODULE,?LINE]]),
     Reply = {unmatched_signal,?MODULE,Request,From},
     {reply, Reply, State}.
 
@@ -276,7 +273,7 @@ handle_call(Request, From, State) ->
 %% --------------------------------------------------------------------
 
 handle_cast(Msg, State) ->
-    io:format("unmatched match cast ~p~n",[{Msg,?MODULE,?LINE}]),
+    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Unmatched signal  : ",Msg,?MODULE,?LINE]]),
     {noreply, State}.
 
 %% --------------------------------------------------------------------
@@ -292,7 +289,7 @@ handle_info({ssh_cm,_,_}, State) ->
     {noreply, State};
 
 handle_info(Info, State) ->
-    io:format("unmatched match~p~n",[{Info,?MODULE,?LINE}]), 
+    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Unmatched signal  : ",Info,?MODULE,?LINE]]),
     {noreply, State}.
 
 %% --------------------------------------------------------------------

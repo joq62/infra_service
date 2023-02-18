@@ -138,9 +138,6 @@ initiate(InstanceId)->
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
 init([]) -> 
-
-    
-    io:format("Started Server ~p~n",[{?MODULE,?LINE}]),
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Servere started"]]),
     {ok, #state{
 	    cluster_spec=undefined,
@@ -168,7 +165,6 @@ handle_call({load_desired_state,ClusterSpec},_From, State) ->
     sd:call(db_etcd,db_pod_desired_state,create_table,[],5000),
     Reply=case lib_appl:load_desired_state(ClusterSpec) of
 	      ok->
-		  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK: initiation of desired state : ",ClusterSpec]]),
 		  NewState=State#state{cluster_spec=ClusterSpec},
 		  ok;
 	      {error,ErrorList}->
@@ -184,7 +180,6 @@ handle_call({load_desired_state,ClusterSpec},_From, State) ->
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-
 handle_call({desired_nodes},_From, State) ->
     Reply=case State#state.cluster_spec of
 	      undefined->
@@ -242,11 +237,8 @@ handle_call({stopped_appls},_From, State) ->
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-
 handle_call({create_appl,ApplSpec,PodNode},_From, State) ->
     Reply=lib_appl:create_appl(ApplSpec,PodNode),
-    io:format("Reply, ApplSpec,PodNode ~p~n",[{Reply,ApplSpec,PodNode,?MODULE,?LINE}]),
- 
     {reply, Reply, State};
     
 
@@ -255,13 +247,12 @@ handle_call({create_appl,ApplSpec,PodNode},_From, State) ->
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-
-
 handle_call({ping},_From, State) ->
     Reply=pong,
     {reply, Reply, State};
 
 handle_call(Request, From, State) ->
+    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Unmatched signal  : ",Request,?MODULE,?LINE]]),
     Reply = {unmatched_signal,?MODULE,Request,From},
     {reply, Reply, State}.
 
@@ -273,6 +264,7 @@ handle_call(Request, From, State) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
 handle_cast(Msg, State) ->
+    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Unmatched signal  : ",Msg,?MODULE,?LINE]]),
     io:format("unmatched match cast ~p~n",[{Msg,?MODULE,?LINE}]),
     {noreply, State}.
 
@@ -287,7 +279,7 @@ handle_info({ssh_cm,_,{closed,0}}, State) ->
     {noreply, State};
 
 handle_info(Info, State) ->
-    io:format("unmatched match~p~n",[{Info,?MODULE,?LINE}]), 
+    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Unmatched signal  : ",Info,?MODULE,?LINE]]),
     {noreply, State}.
 
 %% --------------------------------------------------------------------
@@ -372,15 +364,6 @@ do_new_on_pod(ApplSpec,PodNode,ClusterSpec,TimeOut)->
 		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
 		   {error,Reason};
 	       ok->
-		   {atomic,ok}=sd:call(db_etcd,db_appl_instance,create,[ClusterSpec,ApplSpec,PodNode,HostSpec,{date(),time()}],5000),
-		   {ok,LocalTypeList}=db_appl_spec:read(local_type,ApplSpec),
-		   [rpc:call(PodNode,rd,add_local_resource,[LocalType,PodNode],5000)||LocalType<-LocalTypeList],
-						%   [rd:add_target_resource_type(LocalType)||LocalType<-LocalTypeList],
-		   {ok,TargetTypeList}=db_appl_spec:read(target_type,ApplSpec),
-		   [rpc:call(PodNode,rd,add_target_resource_type,[TargetType],5000)||TargetType<-TargetTypeList],
-		   rpc:call(PodNode,rd,trade_resources,[],5000),
-		   timer:sleep(2000),
-		   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["application created ",ApplSpec,PodNode]]),
 		   ok
 	   end,
     Result.
@@ -392,10 +375,8 @@ do_new_on_pod(ApplSpec,PodNode,ClusterSpec,TimeOut)->
 appl_new(ApplSpec,HostSpec,ClusterSpec,TimeOut)->
     Result=case pod_server:get_pod(ApplSpec,HostSpec) of
 	       {error,Reason}->
-		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
 		   {error,Reason};
 	       []->
-		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,[no_pods_available]}]),
 		   {error,[no_pods_available,?MODULE,?LINE]};
 	       {ok,PodNode}->
 		   {ok,PodDir}=db_cluster_instance:read(pod_dir,ClusterSpec,PodNode),
@@ -410,7 +391,6 @@ appl_new(ApplSpec,HostSpec,ClusterSpec,TimeOut)->
 			   {error,Reason};
 		       ok->
 			   {atomic,ok}=db_appl_instance:create(ClusterSpec,ApplSpec,PodNode,HostSpec,{date(),time()}),
-			   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["application created ",ApplSpec,PodNode]]),
 			   {ok,PodNode}
 		   end
 	   end,
@@ -420,7 +400,6 @@ appl_new(ApplSpec,HostSpec,ClusterSpec,TimeOut)->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-
 do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut)->
     Result= case rpc:call(PodNode,file,make_dir,[ApplDir],5000) of
 		{error,Reason}->
@@ -445,13 +424,6 @@ do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut)->
 					    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
 					    {error,Reason};
 					ok->
-					    {ok,LocalTypeList}=db_appl_spec:read(local_type,ApplSpec),
-					    [rpc:call(PodNode,rd,add_local_resource,[LocalType,PodNode],5000)||LocalType<-LocalTypeList],
-						%   [rd:add_target_resource_type(LocalType)||LocalType<-LocalTypeList],
-					    {ok,TargetTypeList}=db_appl_spec:read(target_type,ApplSpec),
-					    [rpc:call(PodNode,rd,add_target_resource_type,[TargetType],5000)||TargetType<-TargetTypeList],
-					    rpc:call(PodNode,rd,trade_resources,[],5000),
-					    timer:sleep(2000),
 					    ok
 				    end
 			    end

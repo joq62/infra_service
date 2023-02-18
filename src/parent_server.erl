@@ -100,9 +100,7 @@ ping() ->
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
 init([]) -> 
-    io:format("Started Server ~p~n",[{?MODULE,?LINE}]),
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Servere started"]]),
-
     {ok, #state{cluster_spec=undefined}}.   
  
 
@@ -117,10 +115,8 @@ init([]) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
 handle_call({load_desired_state,ClusterSpec},_From, State) ->
-    sd:call(db_etcd,db_parent_desired_state,create_table,[],5000),
     Reply=case lib_parent:load_desired_state(ClusterSpec) of
 	      ok->
-		  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK: initiation of desired state : ",ClusterSpec]]),
 		  NewState=State#state{cluster_spec=ClusterSpec},
 		  ok;
 	      {error,ErrorList}->
@@ -133,12 +129,10 @@ handle_call({load_desired_state,ClusterSpec},_From, State) ->
 handle_call({create_node,ParentNode},_From, State) ->
     Reply=case State#state.cluster_spec of
 	      undefined->
-		  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: Not initiated : ",undefined]]),
 		  {error,["Not initiated : ",undefined]};
 	      _ClusterSpec->
 		  case lib_parent:create_node(ParentNode) of
 		      ok->
-			  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK: created node : ",ParentNode]]),
 			  ok;
 		      {error,Reason}->
 			  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["ERROR: creating node : ",ParentNode,Reason]]),
@@ -200,6 +194,7 @@ handle_call({ping},_From, State) ->
     {reply, Reply, State};
 
 handle_call(Request, From, State) ->
+    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Unmatched signal  : ",Request,?MODULE,?LINE]]),
     Reply = {unmatched_signal,?MODULE,Request,From},
     {reply, Reply, State}.
 
@@ -210,10 +205,8 @@ handle_call(Request, From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
-
-
 handle_cast(Msg, State) ->
-    io:format("unmatched match cast ~p~n",[{Msg,?MODULE,?LINE}]),
+    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Unmatched signal  : ",Msg,?MODULE,?LINE]]),
     {noreply, State}.
 
 %% --------------------------------------------------------------------
@@ -227,7 +220,7 @@ handle_info({ssh_cm,_,_}, State) ->
     {noreply, State};
 
 handle_info(Info, State) ->
-    io:format("unmatched match~p~n",[{Info,?MODULE,?LINE}]), 
+    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Unmatched signal  : ",Info,?MODULE,?LINE]]),
     {noreply, State}.
 
 %% --------------------------------------------------------------------
