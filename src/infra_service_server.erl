@@ -91,7 +91,7 @@ handle_call({config,ClusterSpec},_From, State) ->
 			  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error when calling init_servers  : ",Reason,?MODULE,?LINE]]),
 			  {error,["Error when calling init_servers :",init_servers,?MODULE,?LINE]};
 		      ok->
-			  case rpc:cast(node(),lib_infra_service,start_orchistrate,[]) of
+			  case rpc:cast(node(),lib_infra_service,start_orchistrate,[ClusterSpec]) of
 			      {badrpc,Reason}->
 				  NewState=State,
 				  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error when calling orchistrate  : ",Reason,?MODULE,?LINE]]),
