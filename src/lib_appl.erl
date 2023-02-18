@@ -136,6 +136,7 @@ create_appl(ApplSpec,PodNode,TimeOut)->
 					  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
 					  {error,Reason};
 				      {ok,ApplicationConfig}->
+					  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG ok ApplicationConfig :",ApplicationConfig,?MODULE,?LINE]]),
 					  _SetEnvResult=[rpc:call(PodNode,application,set_env,[[Config]],5000)||Config<-ApplicationConfig],
 					  {ok,PodApplGitPath}=db_appl_spec:read(gitpath,ApplSpec),
 					  case do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut) of
@@ -143,6 +144,7 @@ create_appl(ApplSpec,PodNode,TimeOut)->
 						  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
 						  {error,["Error during do_start : ",Reason,ApplSpec,PodNode,?MODULE,?FUNCTION_NAME,?LINE]};
 					      ok->
+						  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Ok succes :", ?MODULE,?LINE]]),
 						  ok
 					  end
 				  end
