@@ -318,9 +318,9 @@ create_appl(ApplSpecInfoList)->
 create_appl([],Acc)->
     Acc;
 create_appl([{PodNode,ApplSpec,App}|T],Acc)->
-    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG PodNode,ApplSpec,App :", PodNode,ApplSpec,App,?MODULE,?LINE]]),
+%    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG PodNode,ApplSpec,App :", PodNode,ApplSpec,App,?MODULE,?LINE]]),
     Result=appl_server:create_appl(ApplSpec,PodNode),
-    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG PResult :", Result,?MODULE,?LINE]]),
+%    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG PResult :", Result,?MODULE,?LINE]]),
     create_appl(T,[{Result,PodNode,ApplSpec,App}|Acc]).
 
 %%--------------------------------------------------------------------
