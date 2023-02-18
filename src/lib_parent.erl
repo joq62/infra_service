@@ -106,7 +106,10 @@ create_node(ParentNode)->
 		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: ops_ssh:create : ",Reason,?MODULE,?LINE]]),
 		   {error,Reason};
 	       {ok,ParentNode}->
-		   ok
+		   ok;
+	       Error ->
+		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: ops_ssh:create : ",Error,?MODULE,?LINE]]),
+		   {error,Error}
 	   end,
     Result.    
 %%--------------------------------------------------------------------
