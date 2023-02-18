@@ -171,22 +171,31 @@ do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut)->
 		{error,Reason}->
 		    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
 		    {error,["Error when cloning : ", Reason,PodNode,PodApplGitPath,ApplDir,?MODULE,?FUNCTION_NAME,?LINE]};
-		{ok,_}->
-		    {ok,PodApp}=sd:call(db_etcd,db_appl_spec,read,[app,ApplSpec],5000),
-		    ApplEbin=filename:join([ApplDir,"ebin"]),
-		    Paths=[ApplEbin],
-		    case appl:load(PodNode,PodApp,Paths) of
+		{ok,CloneDir}->
+		    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG ok CloneDir:",CloneDir,?MODULE,?LINE]]),
+		    case sd:call(db_etcd,db_appl_spec,read,[app,ApplSpec],5000) of
 			{error,Reason}->
 			    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
-			    {error,["Error when loading application : ",Reason,PodNode,PodApp,Paths,?MODULE,?FUNCTION_NAME,?LINE]}; 
-			ok->
-			    case appl:start(PodNode,PodApp,TimeOut) of
+			    {error,["Error when cloning : ", Reason,?MODULE,?FUNCTION_NAME,?LINE]};
+			{ok,PodApp}->
+			    ApplEbin=filename:join([ApplDir,"ebin"]),
+			    Paths=[ApplEbin],
+			    case appl:load(PodNode,PodApp,Paths) of
 				{error,Reason}->
 				    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
-				    {error,Reason};
+				    {error,["Error when loading application : ",Reason,PodNode,PodApp,Paths,?MODULE,?FUNCTION_NAME,?LINE]}; 
 				ok->
-				    ok
+				    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG ok Load :",?MODULE,?LINE]]),
+				    case appl:start(PodNode,PodApp,TimeOut) of
+					{error,Reason}->
+					    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
+					    {error,Reason};
+					ok->
+					    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG ok start :",?MODULE,?LINE]]),
+					    ok
+				    end
 			    end
+
 		    end
 	    end,
     Result.
