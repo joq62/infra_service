@@ -111,6 +111,8 @@ start_parents()->
     CreateResult=[{parent_server:create_node(Parent),Parent}||Parent<-StoppedParents],
     [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Creating parent node :", Reason,ParentNode,?MODULE,?LINE]])||
 	{{error,Reason},ParentNode}<-CreateResult],
+    [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Creating parent node :",ParentNode,?MODULE,?LINE]])||
+	{ok,ParentNode}<-CreateResult],
     {ok,ActiveParents}=parent_server:active_nodes(),
     _R1=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
 								   Pod2<-ActiveParents,
@@ -131,6 +133,9 @@ start_pods()->
     CreateResult=[{pod_server:create_node(Pod),Pod}||Pod<-Stopped],
     [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Creating pod node :", Reason,Pod,?MODULE,?LINE]])||
 	{{error,Reason},Pod}<-CreateResult],
+
+    [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Creating pod node :",Pod,?MODULE,?LINE]])||
+	{ok,Pod}<-CreateResult],
     
     CommonStart=[{appl_server:create_appl("common",PodNode),PodNode}||{ok,PodNode}<-CreateResult],
   %  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: CommonStart : ",CommonStart,node(),?MODULE,?LINE]]),
@@ -158,16 +163,22 @@ start_infra_appls(ClusterSpec)->
 											 nodelog==App],
     [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error starting appl :", Reason,ApplSpec,PodNode,?MODULE,?LINE]])||
 	{{error,Reason},ApplSpec,PodNode}<- R_Nodelog],
+    [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Creating appl  node :",ApplSpec,PodNode,?MODULE,?LINE]])||
+	{ok,ApplSpec,PodNode}<-R_Nodelog],
     
     R_db_etcd=[{create_infra_appl({PodNode,ApplSpec,App},ClusterSpec),ApplSpec,PodNode}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
 											 db_etcd==App],
     [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error starting appl :", Reason,ApplSpec,PodNode,?MODULE,?LINE]])||
 	{{error,Reason},ApplSpec,PodNode}<-R_db_etcd],
+    [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Creating appl  node :",ApplSpec,PodNode,?MODULE,?LINE]])||
+	{ok,ApplSpec,PodNode}<-R_db_etcd],
 
     R_infra_service=[{create_infra_appl({PodNode,ApplSpec,App},ClusterSpec),ApplSpec,PodNode}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
 											       infra_service==App],
     [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error starting appl :", Reason,ApplSpec,PodNode,?MODULE,?LINE]])||
 	{{error,Reason},ApplSpec,PodNode}<-R_infra_service],
+    [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Creating appl  node :",ApplSpec,PodNode,?MODULE,?LINE]])||
+	{ok,ApplSpec,PodNode}<-R_infra_service],
     
   %  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: StoppedApplInfoLists : ",StoppedApplInfoLists,node(),?MODULE,?LINE]]),
     
