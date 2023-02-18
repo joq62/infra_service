@@ -99,7 +99,7 @@ create_node(ParentNode,NodeName,PodDir,PaArgsList,EnvArgs)->
 			   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error creating PodName on ParentNode",NodeName,ParentNode,Reason]]),
 			   {badrpc,["Error  :",Reason,ParentNode]};	
 		       CookieAtom->
-			    Cookie=atom_to_list(CookieAtom),
+			   Cookie=atom_to_list(CookieAtom),
 			   Args=" -setcookie "++Cookie++" "++EnvArgs,
 			   case rpc:call(ParentNode,slave,start,[HostName,NodeName,Args],5000) of
 			       {badrpc,Reason}->
@@ -129,7 +129,6 @@ create_node(ParentNode,NodeName,PodDir,PaArgsList,EnvArgs)->
 					       ok->  
 						   []=[{error,Path}||Path<-[PodDir|PaArgsList],
 								     true/=rpc:call(SlaveNode,code,add_patha,[Path],5000)],
-						   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Pod node succesfully created with Dir  ",SlaveNode,PodDir]]),
 						   ok
 					   end
 				   end

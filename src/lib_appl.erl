@@ -56,7 +56,6 @@ desired_appls()->
 active_appls()->
   
     A1=[{PodNode,sd:call(db_etcd,db_pod_desired_state,read,[appl_spec_list,PodNode],5000)}||PodNode<-sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000)],
-  %  io:format("A1 ~p~n",[{A1,?MODULE,?FUNCTION_NAME,?LINE}]),
     A2=[{PodNode,ApplList}||{PodNode,{ok,ApplList}}<-A1],
     PodApplSpecAppList=lists:append([pod_app_list(PodApplSpecList,[])||PodApplSpecList<-A2]),
     {ok,StoppedAppls}=stopped_appls(),
@@ -107,8 +106,7 @@ create_appl(ApplSpec,PodNode)->
     create_appl(ApplSpec,PodNode,?TimeOut).
 
 create_appl(ApplSpec,PodNode,TimeOut)->
-    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG ApplSpec,PodNode :", ApplSpec,PodNode,?MODULE,?LINE]]),
-   Result=case sd:call(db_etcd,db_pod_desired_state,read,[pod_dir,PodNode],5000) of
+    Result=case sd:call(db_etcd,db_pod_desired_state,read,[pod_dir,PodNode],5000) of
 	      {error,Reason}->
 		  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
 		  {error,Reason};
