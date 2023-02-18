@@ -87,7 +87,6 @@ handle_call({config,ClusterSpec},_From, State) ->
 			  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error when calling init_servers  : ",Reason,?MODULE,?LINE]]),
 			  {error,["Error when calling init_servers :",init_servers,?MODULE,?LINE]};
 		      ok->
-			  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK config succeded  : ",ClusterSpec,?MODULE,?LINE]]),
 			  NewState=State#state{cluster_spec=ClusterSpec},
 			  ok
 		  end;
@@ -109,7 +108,6 @@ handle_call({start_orchistrate},_From, State) ->
 			  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error when calling orchistrate  : ",Reason,?MODULE,?LINE]]),
 			  {error,["Error when calling orchistrate :",Reason,?MODULE,?LINE]};
 		      true->
-			  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK start_orchistrate  : ",?MODULE,?LINE]]),
 			  ok
 		  end
 	  end,
