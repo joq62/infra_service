@@ -265,7 +265,8 @@ create_infra_appl({PodNode,ApplSpec,infra_service},ClusterSpec) ->
 start_user_appls()->
     {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),
     StoppedUserApplications=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-						     pod/=App,
+						     common/=App,
+						     sd/=App,
 						     db_etcd/=App,
 						     nodelog/=App,
 						     infra_service/=App],
