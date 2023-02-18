@@ -103,7 +103,7 @@ create_node(ParentNode)->
     EnvArgs=" -detached ",
     PaArgs=" ",
     TimeOut=10*1000,
-    Result=case rpc:call(node(),ops_ssh,creat,[HostSpec,NodeName,Cookie,PaArgs,EnvArgs,TimeOut],TimeOut+1000) of
+    Result=case rpc:call(node(),ops_ssh,create,[HostSpec,NodeName,Cookie,PaArgs,EnvArgs,TimeOut],TimeOut+1000) of
 	       {error,Reason}->
 		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: ops_ssh:create : ",Reason,?MODULE,?LINE]]),
 		   {error,Reason};

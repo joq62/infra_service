@@ -79,7 +79,10 @@ start_parents()->
     timer:sleep(1000),
     %------------------
     {ok,StoppedParents}=parent_server:stopped_nodes(),
-    [parent_server:create_node(Parent)||Parent<-StoppedParents],
+    StartParents=[{parent_server:create_node(Parent),Parent}||Parent<-StoppedParents],
+
+    io:format("StartParents ~p~n",[{StartParents,?MODULE,?LINE}]),
+
     {ok,ActiveParents}=parent_server:active_nodes(),
     [{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
 								   Pod2<-ActiveParents,
