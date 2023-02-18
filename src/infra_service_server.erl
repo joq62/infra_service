@@ -91,15 +91,8 @@ handle_call({config,ClusterSpec},_From, State) ->
 			  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error when calling init_servers  : ",Reason,?MODULE,?LINE]]),
 			  {error,["Error when calling init_servers :",init_servers,?MODULE,?LINE]};
 		      ok->
-			  case rpc:cast(node(),lib_infra_service,start_orchistrate,[ClusterSpec]) of
-			      {badrpc,Reason}->
-				  NewState=State,
-				  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error when calling orchistrate  : ",Reason,?MODULE,?LINE]]),
-				  {error,["Error when calling orchistrate :",Reason,?MODULE,?LINE]};
-			      true->
-				  NewState=State#state{cluster_spec=ClusterSpec},
-				  ok
-			  end
+			  NewState=State#state{cluster_spec=ClusterSpec},
+			  ok
 		  end;
 	      AlreadyConfig->
 		  NewState=State,
@@ -107,6 +100,22 @@ handle_call({config,ClusterSpec},_From, State) ->
 		  {error,["Error  Already configured:",ClusterSpec,?MODULE,?LINE]}
 	  end,	  		      
     {reply, Reply, NewState};
+
+handle_call({start_orchistrate},_From, State) ->
+    Reply=case State#state.cluster_spec of 
+	      undefined->
+		  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Warning cluster not inititaded",node(),?MODULE,?LINE]]),
+		  {error,["Warning cluster not inititaded"]};
+	      ClusterSpec->
+		  case rpc:cast(node(),lib_infra_service,start_orchistrate,[ClusterSpec]) of
+		      {badrpc,Reason}->
+			  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error when calling orchistrate  : ",Reason,?MODULE,?LINE]]),
+			  {error,["Error when calling orchistrate :",Reason,?MODULE,?LINE]};
+		      true->
+			  ok
+		  end
+	  end,
+    {reply, Reply, State};
 
 handle_call({ping},_From, State) ->
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ping",node()]]),
@@ -126,10 +135,6 @@ handle_call(Request, From, State) ->
 %% --------------------------------------------------------------------
 
 
-handle_cast({start_orchistrate}, State) ->
-    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["  : ",?MODULE,?LINE,?FUNCTION_NAME]]),
-    rpc:cast(node(),lib_infra_service,orchistrate,[]),
-    {noreply, State};
 
 
 handle_cast({orchistrate_result,_ResultStartParentPods,
