@@ -137,9 +137,16 @@ handle_call(Request, From, State) ->
 
 
 
-handle_cast({orchistrate_result,_ResultStartParentPods,
-	     _ResultStartInfraAppls,_ResultStartUserAppls}, State) ->
-    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Start  : ",?MODULE,?LINE]]),
+handle_cast({orchistrate_result,
+	     ResultStartParents,
+	     ResultStartPods,
+	     ResultStartInfraAppls,
+	     ResultStartUserAppls}, State) ->
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Start result  : ",
+							      ResultStartParents,
+							      ResultStartPods,
+							      ResultStartInfraAppls,
+							      ResultStartUserAppls,?MODULE,?LINE]]),
 
     
    % {ok,StoppedParents}=parent_server:stopped_nodes(),

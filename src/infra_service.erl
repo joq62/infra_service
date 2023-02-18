@@ -14,7 +14,7 @@
 	 is_config/0,
 	 config/1,
 	 start_orchistrate/0,
-	 orchistrate_result/3,
+	 orchistrate_result/4,
 	 ping/0
 
 	]).
@@ -53,9 +53,12 @@ config(ClusterSpec)->
     
 start_orchistrate()->
     gen_server:call(?SERVER, {start_orchistrate},infinity).
-orchistrate_result(ResultStartParentPods,ResultStartInfraAppls,ResultStartUserAppls)->
-    gen_server:cast(?SERVER,{orchistrate_result,ResultStartParentPods,
-		    ResultStartInfraAppls,ResultStartUserAppls},infinity).    
+orchistrate_result(ResultStartParents,ResultStartPods,ResultStartInfraAppls,ResultStartUserAppls)->
+    gen_server:cast(?SERVER,{orchistrate_result,
+			     ResultStartParents,
+			     ResultStartPods,
+			     ResultStartInfraAppls,
+			     ResultStartUserAppls},infinity).    
 
 
 %% ====================================================================!
