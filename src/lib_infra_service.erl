@@ -285,8 +285,6 @@ create_appl([],Acc)->
     Acc;
 create_appl([{PodNode,ApplSpec,App}|T],Acc)->
     Result=appl_server:create_appl(ApplSpec,PodNode),
-    io:format("Ping  ~p~n",[{rpc:call(PodNode,App,ping,[],2000),PodNode,ApplSpec,?MODULE,?FUNCTION_NAME,?LINE}]),
-    io:format("Creat Appl Result ~p~n",[{Result,PodNode,ApplSpec,?MODULE,?FUNCTION_NAME,?LINE}]),
     create_appl(T,[{Result,PodNode,ApplSpec,App}|Acc]).
 
 %%--------------------------------------------------------------------
