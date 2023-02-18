@@ -77,6 +77,7 @@ init_servers(ClusterSpec)->
 orchistrate(ClusterSpec)->
     orchistrate(ClusterSpec,?SleepInterval).
 orchistrate(ClusterSpec,SleepInterval)->
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG orchistrate  : ",?MODULE,?LINE]]),
     timer:sleep(SleepInterval),
     ResultStartParents=rpc:call(node(),?MODULE,start_parents,[],15*1000),
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultStartParents  : ",ResultStartParents,?MODULE,?LINE]]),
