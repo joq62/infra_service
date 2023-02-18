@@ -107,30 +107,38 @@ create_appl(ApplSpec,PodNode)->
     create_appl(ApplSpec,PodNode,?TimeOut).
 
 create_appl(ApplSpec,PodNode,TimeOut)->
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG ApplSpec,PodNode :", ApplSpec,PodNode,?MODULE,?LINE]]),
    Result=case sd:call(db_etcd,db_pod_desired_state,read,[pod_dir,PodNode],5000) of
 	      {error,Reason}->
+		  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
 		  {error,Reason};
 	      {ok,PodDir}->
+		  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Ok PodDir :", PodDir,?MODULE,?LINE]]),
 		  ApplDir=filename:join(PodDir,ApplSpec),
 		  rpc:call(PodNode,file,del_dir_r,[ApplDir],5000),
 		  case rpc:call(PodNode,file,make_dir,[ApplDir],5000) of
 		      {badrpc,Reason}->
+			  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
 			  {error,["Error during do_start : ",badrpc,Reason,ApplSpec,PodNode,?MODULE,?FUNCTION_NAME,?LINE]};
 		      {error,Reason}->
+			  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
 			  {error,Reason};
 		      ok->
 			  case sd:call(db_etcd,db_pod_desired_state,read,[host_spec,PodNode],5000) of
 			        {error,Reason}->
+				  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
 				  {error,Reason};
 			      {ok,HostSpec}->
 				  case sd:call(db_etcd,db_host_spec,read,[application_config,HostSpec],5000) of
 				      {error,Reason}->
+					  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
 					  {error,Reason};
 				      {ok,ApplicationConfig}->
 					  _SetEnvResult=[rpc:call(PodNode,application,set_env,[[Config]],5000)||Config<-ApplicationConfig],
 					  {ok,PodApplGitPath}=db_appl_spec:read(gitpath,ApplSpec),
 					  case do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut) of
 					      {error,Reason}->
+						  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
 						  {error,["Error during do_start : ",Reason,ApplSpec,PodNode,?MODULE,?FUNCTION_NAME,?LINE]};
 					      ok->
 						  ok
@@ -146,8 +154,11 @@ create_appl(ApplSpec,PodNode,TimeOut)->
 %% @end
 %%--------------------------------------------------------------------
 do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut)->
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG ApplSpec,PodNode,PodApplGitPath,ApplDir :", 
+							      ApplSpec,PodNode,PodApplGitPath,ApplDir,?MODULE,?LINE]]),
     Result= case appl:git_clone_to_dir(PodNode,PodApplGitPath,ApplDir) of
 		{error,Reason}->
+		    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
 		    {error,["Error when cloning : ", Reason,PodNode,PodApplGitPath,ApplDir,?MODULE,?FUNCTION_NAME,?LINE]};
 		{ok,_}->
 		    {ok,PodApp}=sd:call(db_etcd,db_appl_spec,read,[app,ApplSpec],5000),
@@ -155,10 +166,12 @@ do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut)->
 		    Paths=[ApplEbin],
 		    case appl:load(PodNode,PodApp,Paths) of
 			{error,Reason}->
+			    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
 			    {error,["Error when loading application : ",Reason,PodNode,PodApp,Paths,?MODULE,?FUNCTION_NAME,?LINE]}; 
 			ok->
 			    case appl:start(PodNode,PodApp,TimeOut) of
 				{error,Reason}->
+				    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
 				    {error,Reason};
 				ok->
 				    ok
