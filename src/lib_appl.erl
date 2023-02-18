@@ -139,7 +139,7 @@ create_appl(ApplSpec,PodNode,TimeOut)->
 					  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG ok ApplicationConfig :",ApplicationConfig,?MODULE,?LINE]]),
 					  SetEnvResult=[rpc:call(PodNode,application,set_env,[[Config]],5000)||Config<-ApplicationConfig],
 					  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG SetEnvResul :",SetEnvResult,?MODULE,?LINE]]),
-					  case db_appl_spec:read(gitpath,ApplSpec) of 
+					  case sd:call(db_etcd,db_appl_spec,read,[gitpath,ApplSpec],5000) of 
 					      {error,Reason}->
 						  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
 						  {error,["Error during do_start : ",Reason,ApplSpec,PodNode,?MODULE,?FUNCTION_NAME,?LINE]};
