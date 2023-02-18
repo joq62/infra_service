@@ -130,6 +130,13 @@ start_pods()->
     CreateResult=[{pod_server:create_node(Pod),Pod}||Pod<-Stopped],
     [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Creating pod node :", Reason,Pod,?MODULE,?LINE]])||
 	{{error,Reason},Pod}<-CreateResult],
+    
+    CommonStart=[{appl_server:create_appl("common",PodNode),PodNode}||{ok,PodNode}<-CreateResult],
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: CommonStart : ",CommonStart,node(),?MODULE,?LINE]]),
+    
+    SdStart=[{appl_server:create_appl("sd",PodNode),PodNode}||{ok,PodNode}<-CreateResult],
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: SdStart : ",SdStart,node(),?MODULE,?LINE]]),
+
     {ok,Active}=pod_server:active_nodes(),
     _R1=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-Active,
 								   Pod2<-Active,
