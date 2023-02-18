@@ -107,7 +107,7 @@ handle_call({start_orchistrate},_From, State) ->
 		  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Warning cluster not inititaded",node(),?MODULE,?LINE]]),
 		  {error,["Warning cluster not inititaded"]};
 	      ClusterSpec->
-		  case rpc:cast(node(),lib_infra_service,start_orchistrate,[ClusterSpec]) of
+		  case rpc:cast(node(),lib_infra_service,orchistrate,[ClusterSpec]) of
 		      {badrpc,Reason}->
 			  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error when calling orchistrate  : ",Reason,?MODULE,?LINE]]),
 			  {error,["Error when calling orchistrate :",Reason,?MODULE,?LINE]};
@@ -176,7 +176,7 @@ handle_cast({orchistrate_result,_ResultStartParentPods,
     end,
     
     
-    rpc:cast(node(),lib_infra_service,orchistrate,[]),
+    rpc:cast(node(),lib_infra_service,orchistrate,[State#state.cluster_spec]),
     {noreply, State};
 
 handle_cast(Msg, State) ->

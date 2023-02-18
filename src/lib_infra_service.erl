@@ -19,8 +19,8 @@
 	 create_pods_based_appl/1,
 	 init_servers/1,
 	 ensure_right_cookie/1,
-	 orchistrate/0,
 	 orchistrate/1,
+	 orchistrate/2,
 	 start_parents/0,
 	 start_pods/0,
 	 start_infra_appls/1,
@@ -74,9 +74,9 @@ init_servers(ClusterSpec)->
 %% @end
 %%--------------------------------------------------------------------
 
-orchistrate()->
-    orchistrate(?SleepInterval).
-orchistrate(SleepInterval)->
+orchistrate(ClusterSpec)->
+    orchistrate(ClusterSpec,?SleepInterval).
+orchistrate(ClusterSpec,SleepInterval)->
     timer:sleep(SleepInterval),
     ResultStartParents=rpc:call(node(),?MODULE,start_parents,[],15*1000),
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultStartParents  : ",ResultStartParents,?MODULE,?LINE]]),
@@ -85,7 +85,7 @@ orchistrate(SleepInterval)->
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultStartPods  : ",ResultStartPods,?MODULE,?LINE]]),
     
 
-    ResultStartInfraAppls=rpc:call(node(),?MODULE,start_infra_appls,[],60*1000),
+    ResultStartInfraAppls=rpc:call(node(),?MODULE,start_infra_appls,[ClusterSpec],60*1000),
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultStartInfraAppls  : ",ResultStartInfraAppls,?MODULE,?LINE]]),
     ResultStartUserAppls=rpc:call(node(),?MODULE,start_user_appls,[],60*1000), 
 
