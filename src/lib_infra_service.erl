@@ -290,14 +290,14 @@ start_user_appls()->
 						     nodelog/=App,
 						     infra_service/=App],
 
-    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG StoppedUserApplications  :", StoppedUserApplications,?MODULE,?LINE]]),
-
+%    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG StoppedUserApplications  :", StoppedUserApplications,?MODULE,?LINE]]),
     CreateResult=create_appl(StoppedUserApplications,[]),
-
-    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG CreateResult User Appls  :", CreateResult,?MODULE,?LINE]]),
+%    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG CreateResult User Appls  :", CreateResult,?MODULE,?LINE]]),
     
     [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Creating userr appl :", Reason,PodNode,ApplSpec,?MODULE,?LINE]])||
 	{{error,Reason},PodNode,ApplSpec,_App}<-CreateResult],    
+    [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Creating user appl :", PodNode,ApplSpec,?MODULE,?LINE]])||
+	{ok,PodNode,ApplSpec,_App}<-CreateResult],    
 
     Result=case [{{error,Reason},PodNode,ApplSpec,App}||{{error,Reason},PodNode,ApplSpec,App}<-CreateResult] of
 	       []->
