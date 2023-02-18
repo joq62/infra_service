@@ -144,7 +144,7 @@ create_node(ParentNode,NodeName,PodDir,PaArgsList,EnvArgs)->
 %%--------------------------------------------------------------------
 
 load_desired_state(ClusterSpec)->
-    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["DBG  : ",node(),?MODULE,?FUNCTION_NAME,?LINE]]),
+  %  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["DBG  : ",node(),?MODULE,?FUNCTION_NAME,?LINE]]),
     {ok,Pods}=sd:call(db_etcd,db_cluster_spec,read,[pods,ClusterSpec],5000),
     LoadResult=[{error,Reason}|| {error,Reason}<-load_desired_state(Pods,ClusterSpec,[])],
     case LoadResult of

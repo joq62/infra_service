@@ -139,7 +139,8 @@ handle_cast({orchistrate_result,
 	{error,Reason2}->
 	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error StoppedParents  : ",Reason2,?MODULE,?LINE]]);
 	{ok,[]}->
-	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Parent running : ",?MODULE,?LINE]]);
+	    ok;
+	   % sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Parent running : ",?MODULE,?LINE]]);
 	{ok,StoppedParents}->
 	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error StoppedParents  : ",StoppedParents,?MODULE,?LINE]])
     end,
@@ -148,7 +149,8 @@ handle_cast({orchistrate_result,
 	{error,Reason1}->
 	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error StoppedPods  : ",Reason1,?MODULE,?LINE]]);
 	{ok,[]}->
-	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Pods running  : ",?MODULE,?LINE]]);
+	    ok;
+	    % sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Pods running  : ",?MODULE,?LINE]]);
 	{ok,StoppedPods}->
 	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error StoppedPods  : ",StoppedPods,?MODULE,?LINE]])
     end,
@@ -157,7 +159,8 @@ handle_cast({orchistrate_result,
 	{error,Reason3}->
 	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error StoppedApplInfoLists  : ",Reason3,?MODULE,?LINE]]);
 	{ok,[]}->
-	    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK appls  : ",?MODULE,?LINE]]);
+	    ok;
+	   % sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK appls  : ",?MODULE,?LINE]]);
 	{ok,StoppedApplInfoLists}->
 	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error StoppedApplInfoLists  : ",StoppedApplInfoLists,?MODULE,?LINE]])
     end,
