@@ -83,15 +83,27 @@ stopped_nodes()->
 %% @end
 %%--------------------------------------------------------------------
 create_node(ParentNode)->
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: create_node ParentNode : ",ParentNode,?MODULE,?LINE]]),
     {ok,HostSpec}=sd:call(db_etcd,db_parent_desired_state,read,[host_spec,ParentNode],5000),
+
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: create_node HostSpec : ",HostSpec,?MODULE,?LINE]]),
+
     {ok,NodeName}=sd:call(db_etcd,db_parent_desired_state,read,[node_name,ParentNode],5000),
+
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: create_node NodeName : ",NodeName,?MODULE,?LINE]]),
+    
     {ok,ClusterSpec}=sd:call(db_etcd,db_parent_desired_state,read,[cluster_spec,ParentNode],5000),
+
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: create_node ClusterSpec : ",ClusterSpec,?MODULE,?LINE]]),
+
     {ok,Cookie}=sd:call(db_etcd,db_cluster_spec,read,[cookie,ClusterSpec],5000),
+
     EnvArgs=" -detached ",
     PaArgs=" ",
     TimeOut=10*1000,
     Result=case ops_ssh:create(HostSpec,NodeName,Cookie,PaArgs,EnvArgs,TimeOut) of
 	       {error,Reason}->
+		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: ops_ssh:create : ",Reason,?MODULE,?LINE]]),
 		   {error,Reason};
 	       {ok,ParentNode}->
 		   ok
