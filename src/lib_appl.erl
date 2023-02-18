@@ -192,7 +192,10 @@ do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut)->
 					    {error,Reason};
 					ok->
 					    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG ok start :",?MODULE,?LINE]]),
-					    ok
+					    ok;
+					Error ->
+					    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error start :",Error,?MODULE,?LINE]]),
+					    {error,Error}
 				    end
 			    end
 
