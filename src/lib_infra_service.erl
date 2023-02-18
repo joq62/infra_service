@@ -11,7 +11,7 @@
 
 -define(LogDir,"log_dir").
 -define(LogFileName,"file.logs").
--define(SleepInterval,20*1000).
+-define(SleepInterval,60*1000).
 %% API
 -export([
 	 create_appl/1,
