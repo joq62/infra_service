@@ -98,6 +98,8 @@ create_node(ParentNode)->
 
     {ok,Cookie}=sd:call(db_etcd,db_cluster_spec,read,[cookie,ClusterSpec],5000),
 
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: create_node ClusterSpec : ",ClusterSpec,?MODULE,?LINE]]),
+
     EnvArgs=" -detached ",
     PaArgs=" ",
     TimeOut=10*1000,
@@ -106,6 +108,7 @@ create_node(ParentNode)->
 		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: ops_ssh:create : ",Reason,?MODULE,?LINE]]),
 		   {error,Reason};
 	       {ok,ParentNode}->
+		   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: OK create_node  : ",ParentNode,?MODULE,?LINE]]),
 		   ok;
 	       Error ->
 		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: ops_ssh:create : ",Error,?MODULE,?LINE]]),
