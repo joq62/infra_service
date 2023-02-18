@@ -106,8 +106,10 @@ orchistrate(ClusterSpec,SleepInterval)->
 %% @end
 %%--------------------------------------------------------------------
 start_parents()->
-  %  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: function start : ",node(),?MODULE,?LINE]]),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: function start : ",node(),?MODULE,?LINE]]),
     {ok,StoppedParents}=parent_server:stopped_nodes(),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: StoppedParents : ",StoppedParents,node(),?MODULE,?LINE]]),    
+
     CreateResult=[{parent_server:create_node(Parent),Parent}||Parent<-StoppedParents],
     [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Creating parent node :", Reason,ParentNode,?MODULE,?LINE]])||
 	{{error,Reason},ParentNode}<-CreateResult],
@@ -115,6 +117,7 @@ start_parents()->
 %    [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Creating parent node :",ParentNode,?MODULE,?LINE]])||
 %	{ok,ParentNode}<-CreateResult],
     {ok,ActiveParents}=parent_server:active_nodes(),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: ActiveParents : ",ActiveParents,node(),?MODULE,?LINE]]),
     _R1=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
 								   Pod2<-ActiveParents,
 								   Pod1/=Pod2],	
