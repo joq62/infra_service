@@ -137,15 +137,22 @@ create_appl(ApplSpec,PodNode,TimeOut)->
 					  {error,Reason};
 				      {ok,ApplicationConfig}->
 					  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG ok ApplicationConfig :",ApplicationConfig,?MODULE,?LINE]]),
-					  _SetEnvResult=[rpc:call(PodNode,application,set_env,[[Config]],5000)||Config<-ApplicationConfig],
-					  {ok,PodApplGitPath}=db_appl_spec:read(gitpath,ApplSpec),
-					  case do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut) of
+					  SetEnvResult=[rpc:call(PodNode,application,set_env,[[Config]],5000)||Config<-ApplicationConfig],
+					  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG SetEnvResul :",SetEnvResult,?MODULE,?LINE]]),
+					  case db_appl_spec:read(gitpath,ApplSpec) of 
 					      {error,Reason}->
 						  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
 						  {error,["Error during do_start : ",Reason,ApplSpec,PodNode,?MODULE,?FUNCTION_NAME,?LINE]};
-					      ok->
-						  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Ok succes :", ?MODULE,?LINE]]),
-						  ok
+					       {ok,PodApplGitPath}->
+						  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG ok PodApplGitPath :",PodApplGitPath,?MODULE,?LINE]]),
+						  case do_load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut) of
+						      {error,Reason}->
+							  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
+							  {error,["Error during do_start : ",Reason,ApplSpec,PodNode,?MODULE,?FUNCTION_NAME,?LINE]};
+						      ok->
+							  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Ok succes :", ?MODULE,?LINE]]),
+							  ok
+						  end
 					  end
 				  end
 			  end
