@@ -115,7 +115,7 @@ start_parents()->
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: StoppedParents : ",StoppedParents,node(),?MODULE,?LINE]]),
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: ActiveParents : ",ActiveParents,node(),?MODULE,?LINE]]),
 					
-   ok.
+    StoppedParents.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -132,7 +132,7 @@ start_pods()->
 								   Pod1/=Pod2],	
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: Stopped : ",Stopped,node(),?MODULE,?LINE]]),
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: Active: ",Active,node(),?MODULE,?LINE]]),
-    ok.
+    Stopped.
 
 
 %%--------------------------------------------------------------------
@@ -257,10 +257,8 @@ start_user_appls()->
 						     db_etcd/=App,
 						     nodelog/=App,
 						     infra_service/=App],
-    _=[{error,Reason}||{error,Reason}<-create_appl(StoppedUserApplications,[])],
-
-
-    ok.
+    Result=[{error,Reason}||{error,Reason}<-create_appl(StoppedUserApplications,[])],
+    Result.
 
 %%--------------------------------------------------------------------
 %% @doc

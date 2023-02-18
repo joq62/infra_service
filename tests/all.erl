@@ -13,10 +13,29 @@
     
  
 -export([start/1,
+	 notice/0,warning/0,alert/0,
+	 all_apps/0,
+	 
 	 print/2]).
 %% --------------------------------------------------------------------
 %% Include files
 %% --------------------------------------------------------------------
+all_apps()->
+    [InfraPod|_]=sd:get_node(infra_service),
+    running_apps(InfraPod).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+notice()->
+    sd:call(nodelog,nodelog,read,[notice],2000).
+warning()->
+    sd:call(nodelog,nodelog,read,[warning],2000).
+alert()->
+    sd:call(nodelog,nodelog,read,[alert],2000).
+    
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
