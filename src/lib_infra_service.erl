@@ -80,14 +80,14 @@ orchistrate(ClusterSpec,SleepInterval)->
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG orchistrate  : ",?MODULE,?LINE]]),
     timer:sleep(SleepInterval),
     ResultStartParents=rpc:call(node(),?MODULE,start_parents,[],15*1000),
- %   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultStartParents  : ",ResultStartParents,?MODULE,?LINE]]),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultStartParents  : ",ResultStartParents,?MODULE,?LINE]]),
 
     ResultStartPods=rpc:call(node(),?MODULE,start_pods,[],60*1000),
-  %  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultStartPods  : ",ResultStartPods,?MODULE,?LINE]]),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultStartPods  : ",ResultStartPods,?MODULE,?LINE]]),
     
 
     ResultStartInfraAppls=rpc:call(node(),?MODULE,start_infra_appls,[ClusterSpec],60*1000),
-   % sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultStartInfraAppls  : ",ResultStartInfraAppls,?MODULE,?LINE]]),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultStartInfraAppls  : ",ResultStartInfraAppls,?MODULE,?LINE]]),
     ResultStartUserAppls=rpc:call(node(),?MODULE,start_user_appls,[],60*1000), 
 
     rpc:cast(node(),infra_service,orchistrate_result,[ResultStartParents,
