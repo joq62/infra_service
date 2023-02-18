@@ -124,11 +124,13 @@ create_appl(ApplSpec,PodNode,TimeOut)->
 			  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
 			  {error,Reason};
 		      ok->
+			  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG ok make  dir :", ?MODULE,?LINE]]),
 			  case sd:call(db_etcd,db_pod_desired_state,read,[host_spec,PodNode],5000) of
 			        {error,Reason}->
 				  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
 				  {error,Reason};
 			      {ok,HostSpec}->
+				  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG ok HostSpec :",HostSpec,?MODULE,?LINE]]),
 				  case sd:call(db_etcd,db_host_spec,read,[application_config,HostSpec],5000) of
 				      {error,Reason}->
 					  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Error Reason :", Reason,?MODULE,?LINE]]),
