@@ -52,7 +52,7 @@ config(ClusterSpec)->
     gen_server:call(?SERVER, {config,ClusterSpec},infinity).
     
 start_orchistrate()->
-    gen_server:cast(?SERVER, {start_orchistrate}).
+    gen_server:call(?SERVER, {start_orchistrate},infinity).
 orchistrate_result(ResultStartParentPods,ResultStartInfraAppls,ResultStartUserAppls)->
     gen_server:cast(?SERVER,{orchistrate_result,ResultStartParentPods,
 		    ResultStartInfraAppls,ResultStartUserAppls},infinity).    
