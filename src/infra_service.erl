@@ -58,7 +58,7 @@ orchistrate_result(ResultStartParents,ResultStartPods,ResultStartInfraAppls,Resu
 			     ResultStartParents,
 			     ResultStartPods,
 			     ResultStartInfraAppls,
-			     ResultStartUserAppls},infinity).    
+			     ResultStartUserAppls}).    
 
 
 %% ====================================================================!
