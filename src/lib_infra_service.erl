@@ -215,13 +215,33 @@ create_pods_based_appl(ApplSpec)->
 %% @end
 %%--------------------------------------------------------------------
 create_pod(PodNode)->
-    {ok,ParentNode}=sd:call(db_etcd,db_pod_desired_state,read,[parent_node,PodNode],5000),
-    {ok,NodeName}=sd:call(db_etcd,db_pod_desired_state,read,[node_name,PodNode],5000),
-    {ok,PodDir}=sd:call(db_etcd,db_pod_desired_state,read,[pod_dir,PodNode],5000),
-    {ok,PaArgsList}=sd:call(db_etcd,db_pod_desired_state,read,[pa_args_list,PodNode],5000),
-    {ok,EnvArgs}=sd:call(db_etcd,db_pod_desired_state,read,[env_args,PodNode],5000),
-    pod_server:create_pod(ParentNode,NodeName,PodDir,PaArgsList,EnvArgs).
-
+    Result=case sd:call(db_etcd,db_pod_desired_state,read,[parent_node,PodNode],5000) of
+	       {ok,ParentNode}->
+		   case sd:call(db_etcd,db_pod_desired_state,read,[node_name,PodNode],5000) of
+		       {ok,NodeName}->
+			   case sd:call(db_etcd,db_pod_desired_state,read,[pod_dir,PodNode],5000) of
+			       {ok,PodDir}->
+				   case sd:call(db_etcd,db_pod_desired_state,read,[pa_args_list,PodNode],5000) of
+				       {ok,PaArgsList}->
+					   case sd:call(db_etcd,db_pod_desired_state,read,[env_args,PodNode],5000) of
+					       {ok,EnvArgs}->
+						   rpc:call(node(),pod_server,create_pod,[ParentNode,NodeName,PodDir,PaArgsList,EnvArgs],25*1000);
+					       Reason ->
+						   {error,[Reason,env_args,?MODULE,?LINE]}
+					   end;
+				       Reason ->
+					   {error,[Reason,pa_args_list,?MODULE,?LINE]}
+				   end;
+			       Reason ->
+				   {error,[Reason,pod_dir,?MODULE,?LINE]}
+			   end;
+		       Reason ->
+			   {error,[Reason,node_name,?MODULE,?LINE]}
+		   end;
+	       Reason ->
+		   {error,[Reason,parent_node,?MODULE,?LINE]}
+	   end,
+    Result.
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
@@ -291,28 +311,19 @@ create_infra_appl({PodNode,ApplSpec,infra_service},ClusterSpec) ->
 %% @end
 %%--------------------------------------------------------------------
 start_user_appls()->
-    {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),
-    StoppedUserApplications=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-						     common/=App,
-						     sd/=App,
-						     db_etcd/=App,
-						     nodelog/=App,
-						     infra_service/=App],
-
-%    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG StoppedUserApplications  :", StoppedUserApplications,?MODULE,?LINE]]),
-    CreateResult=create_appl(StoppedUserApplications,[]),
-%    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG CreateResult User Appls  :", CreateResult,?MODULE,?LINE]]),
-    
-    [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Creating userr appl :", Reason,PodNode,ApplSpec,?MODULE,?LINE]])||
-	{{error,Reason},PodNode,ApplSpec,_App}<-CreateResult],    
-    [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Creating user appl :", PodNode,ApplSpec,?MODULE,?LINE]])||
-	{ok,PodNode,ApplSpec,_App}<-CreateResult],    
-
-    Result=case [{{error,Reason},PodNode,ApplSpec,App}||{{error,Reason},PodNode,ApplSpec,App}<-CreateResult] of
-	       []->
-		   ok;
-	       ErrorList->
-		   {error,ErrorList}
+    Result=case rpc:call(node(),appl_server,stopped_appls,[],5*1000) of
+	       {ok,StoppedApplInfoLists}->			  
+		   StoppedUserApplications=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+								    common/=App,
+								    sd/=App,
+								    db_etcd/=App,
+								    nodelog/=App,
+								    infra_service/=App],
+		   ApplCreateResult=create_appl(StoppedUserApplications,[]),
+		   [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Create Result :", CreateResult,?MODULE,?LINE]])||
+		       CreateResult<-ApplCreateResult];
+	       Reason->
+		   {error,["appl_server,stopped_appls ",Reason,?MODULE,?LINE]}
 	   end,
     Result.
 
@@ -322,10 +333,13 @@ start_user_appls()->
 %% @end
 %%--------------------------------------------------------------------
 ensure_right_cookie(ClusterSpec)->
-    {ok,Cookie}=sd:call(db_etcd,db_cluster_spec,read,[cookie,ClusterSpec],5000),
-    erlang:set_cookie(node(),list_to_atom(Cookie)),
-    
-    ok.
+    Result=case sd:call(db_etcd,db_cluster_spec,read,[cookie,ClusterSpec],5000) of
+	       {ok,Cookie}->
+		   erlang:set_cookie(node(),list_to_atom(Cookie));
+	       Reason->
+		   {error,["db_etcd,db_cluster_spec,read,[cookie, ",Reason,?MODULE,?LINE]}
+	   end,
+    Result.
 
 
 %%--------------------------------------------------------------------
@@ -338,8 +352,7 @@ create_appl(ApplSpecInfoList)->
 create_appl([],Acc)->
     Acc;
 create_appl([{PodNode,ApplSpec,App}|T],Acc)->
-%    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG PodNode,ApplSpec,App :", PodNode,ApplSpec,App,?MODULE,?LINE]]),
-    Result=appl_server:create_appl(ApplSpec,PodNode),
+    Result=rpc:call(node(),appl_server,create_appl,[ApplSpec,PodNode],25*1000),
 %    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG PResult :", Result,?MODULE,?LINE]]),
     create_appl(T,[{Result,PodNode,ApplSpec,App}|Acc]).
 
