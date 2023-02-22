@@ -114,12 +114,30 @@ start([ClusterSpec,HostSpec])->
     WhichApplications2=[{Node,rpc:call(Node,application,which_applications,[],5000)}||Node<-nodes()],
     io:format("WhichApplications2 !!! ~p~n",[{WhichApplications2,?MODULE,?FUNCTION_NAME,?LINE}]),
     
-       
-    io:format("Stop OK !!! ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+    loop(),
+    
+%    io:format("Stop OK !!! ~p~n",[{?MODULE,?FUNCTION_NAME}]),
  %   timer:sleep(2000),
  %  init:stop(),
     ok.
 
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+loop()->
+    timer:sleep(20*1000),
+    R_parent_stopped=sd:call(infra_service,parent_server,stopped_nodes,[],10000),
+    R_pod_stopped=sd:call(infra_service,pod_server,stopped_nodes,[],10000),
+    R_appl_stopped=sd:call(infra_service,appl_server,stopped_appls,[],10000),
+    
+    io:format("R_parent_stopped ~p~n",[{date(),time(),R_parent_stopped,?MODULE,?FUNCTION_NAME}]),
+    io:format("R_pod_stopped  ~p~n",[{date(),time(),R_pod_stopped,?MODULE,?FUNCTION_NAME}]),
+    io:format("R_appl_stopped  ~p~n",[{date(),time(),R_appl_stopped,?MODULE,?FUNCTION_NAME}]),
+
+    loop().
 
 %% --------------------------------------------------------------------
 %% Function: available_hosts()
