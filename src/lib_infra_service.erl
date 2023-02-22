@@ -143,8 +143,8 @@ start_pods()->
 		       {ok,Pod}/=CreateRes],
 		   [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Creating pod node :",Pod,?MODULE,?LINE]])||
 		       {ok,Pod}<-CreateResult],
-		   CommonStart=[{rpc:call(node(),appl_server,create_appl,["common",Pod],25*1000),Pod}||{ok,Pod}<-CreateResult],
-		   SdStart=[{rpc:call(node(),appl_server,create_appl,["sd",Pod],25*1000),Pod}||{ok,Pod}<-CreateResult],
+		   _CommonStart=[{rpc:call(node(),appl_server,create_appl,["common",Pod],25*1000),Pod}||{ok,Pod}<-CreateResult],
+		   _SdStart=[{rpc:call(node(),appl_server,create_appl,["sd",Pod],25*1000),Pod}||{ok,Pod}<-CreateResult],
 		   case rpc:call(node(),pod_server,active_nodes,[],15*1000) of
 		       {ok,Active}->
 			   _R1=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-Active,
@@ -170,37 +170,31 @@ start_pods()->
 %% @end
 %%--------------------------------------------------------------------
 start_infra_appls(ClusterSpec)->   
-    {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),    
-    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: StoppedApplInfoLists : ",time(),StoppedApplInfoLists,?MODULE,?LINE]]),
-
-
-    R_Nodelog=[{create_infra_appl({PodNode,ApplSpec,App},ClusterSpec),ApplSpec,PodNode}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-											 nodelog==App],
-    [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error starting appl :", Reason,ApplSpec,PodNode,?MODULE,?LINE]])||
-	{{error,Reason},ApplSpec,PodNode}<- R_Nodelog],
-    [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Creating appl  node :",ApplSpec,PodNode,?MODULE,?LINE]])||
-	{ok,ApplSpec,PodNode}<-R_Nodelog],
-    
-    R_db_etcd=[{create_infra_appl({PodNode,ApplSpec,App},ClusterSpec),ApplSpec,PodNode}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+   Result=case rpc:call(node(),appl_server,stopped_appls,[],30*1000) of
+	      {ok,StoppedApplInfoLists}->
+		  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: StoppedApplInfoLists : ",time(),StoppedApplInfoLists,?MODULE,?LINE]]),
+		  R_Nodelog=[{create_infra_appl({PodNode,ApplSpec,App},ClusterSpec),ApplSpec,PodNode}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+												       nodelog==App],
+		  [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultCreate nodelog :",ResultCreate,?MODULE,?LINE]])||
+		      ResultCreate<- R_Nodelog],
+		  
+		  R_db_etcd=[{create_infra_appl({PodNode,ApplSpec,App},ClusterSpec),ApplSpec,PodNode}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
 											 db_etcd==App],
-    [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error starting appl :", Reason,ApplSpec,PodNode,?MODULE,?LINE]])||
-	{{error,Reason},ApplSpec,PodNode}<-R_db_etcd],
-    [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Creating appl  node :",ApplSpec,PodNode,?MODULE,?LINE]])||
-	{ok,ApplSpec,PodNode}<-R_db_etcd],
+		  [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultCreate db_etcd :",ResultCreate,?MODULE,?LINE]])||
+		      ResultCreate<-R_db_etcd],
 
-    R_infra_service=[{create_infra_appl({PodNode,ApplSpec,App},ClusterSpec),ApplSpec,PodNode}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-											       infra_service==App],
-    [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error starting appl :", Reason,ApplSpec,PodNode,?MODULE,?LINE]])||
-	{{error,Reason},ApplSpec,PodNode}<-R_infra_service],
-    [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Creating appl  node :",ApplSpec,PodNode,?MODULE,?LINE]])||
-	{ok,ApplSpec,PodNode}<-R_infra_service],
-    
-  %  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: StoppedApplInfoLists : ",StoppedApplInfoLists,node(),?MODULE,?LINE]]),
-    
-    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: R_Nodelog : ",R_Nodelog,node(),?MODULE,?LINE]]),
-    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG:  R_db_etcd : ", R_db_etcd,node(),?MODULE,?LINE]]),
-    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG:  R_infra_service : ", R_infra_service,node(),?MODULE,?LINE]]),
-    [{nodelog,R_Nodelog},{db_etcd,R_db_etcd},{infra_service,R_infra_service}].
+		  R_infra_service=[{create_infra_appl({PodNode,ApplSpec,App},ClusterSpec),ApplSpec,PodNode}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
+													     infra_service==App],
+		  [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultCreate db_etcd :",ResultCreate,?MODULE,?LINE]])||
+		      ResultCreate<-R_infra_service],
+		  [{nodelog,R_Nodelog},{db_etcd,R_db_etcd},{infra_service,R_infra_service}];
+	      Reason->
+		  {error,[Reason,?MODULE,?LINE]}
+	  end,
+    Result.
+
+
+		  
 
 %%--------------------------------------------------------------------
 %% @doc
