@@ -37,27 +37,35 @@
 %% @end
 %%--------------------------------------------------------------------
 init_servers(ClusterSpec)->
-    Result=case rpc:call(node(),parent_server,load_desired_state,[ClusterSpec],30*10000) of
-	       ok ->
-		   case rpc:call(node(),pod_server,load_desired_state,[ClusterSpec],30*1000) of
-		       ok ->
-			   case rpc:call(node(),appl_server,load_desired_state,[ClusterSpec],30*1000) of
-			       ok ->
-				   ok;
-			       Reason->
-				   sd:cast(nodelog,nodelog,log,
-					   [warning,?MODULE_STRING,?LINE,["appl_server:load_desired_state  : ",Reason,?MODULE,?LINE]]),
-				   {error,Reason}
-			   end;
-		       Reason->
-			   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,
-							["pod_server:load_desired_state  : ",Reason,?MODULE,?LINE]]),
-			   {error,Reason}
-		   end;			       
-	       Reason->
+ %   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,
+%				 ["DEBUG config,ClusterSpec  : ",ClusterSpec,?MODULE,?LINE]]),
+    Result=case parent_server:load_desired_state(ClusterSpec) of
+	        {error,Reason}->
 		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,
 						["parent_server:load_desired_state  : ",Reason,?MODULE,?LINE]]),
-		   {error,Reason}
+		   {error,Reason};
+	       ok ->
+%		   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,
+%						["parent_server:load_desired_state  : ",ok,?MODULE,?LINE]]),
+		   case pod_server:load_desired_state(ClusterSpec) of
+		       {error,Reason}->
+			   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,
+							["pod_server:load_desired_state  : ",Reason,?MODULE,?LINE]]),
+			   {error,Reason};
+		       ok ->
+%			   sd:cast(nodelog,nodelog,log,
+%				   [notice,?MODULE_STRING,?LINE,["pod_server:load_desired_state  : ",ok,?MODULE,?LINE]]),
+			   case appl_server:load_desired_state(ClusterSpec) of
+			       {error,Reason}->
+				   sd:cast(nodelog,nodelog,log,
+					   [warning,?MODULE_STRING,?LINE,["appl_server:load_desired_state  : ",Reason,?MODULE,?LINE]]),
+				   {error,Reason};
+			       ok ->
+%				   sd:cast(nodelog,nodelog,log,
+%					   [notice,?MODULE_STRING,?LINE,["appl_server:load_desired_state  : ",ok,?MODULE,?LINE]]),
+				   ok
+			   end
+		   end
 	   end,
     Result.
 %%--------------------------------------------------------------------
@@ -99,34 +107,24 @@ orchistrate(ClusterSpec,SleepInterval)->
 %%--------------------------------------------------------------------
 start_parents()->
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: function start : ",node(),?MODULE,?LINE]]),
-    Result=case rpc:call(node(),parent_server,stopped_nodes,[],10*1000) of
-	       {ok,StoppedParents}->
-		   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: StoppedParents : ",StoppedParents,node(),?MODULE,?LINE]]),    
-		   CreateResult=[{rpc:call(node(),parent_server,create_node,[Parent],25*1000),Parent}||Parent<-StoppedParents],
-		   [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Creating parent node :", CreateRes,ParentNode,?MODULE,?LINE]])||
-		       {CreateRes,ParentNode}<-CreateResult,
-		       {ok,ParentNode}/=CreateRes],
-		   case rpc:call(node(),parent_server,active_nodes,[],20*1000) of
-		       {ok,ActiveParents}->
-			   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: ActiveParents : ",ActiveParents,node(),?MODULE,?LINE]]),
-			   _R1=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
-											      Pod2<-ActiveParents,
-											      Pod1/=Pod2];
-		       Reason->
-			   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,
-							["parent_server:active_nodes  : ",Reason,?MODULE,?LINE]]),
-			   {error,Reason}
-		   end;
-	       Reason->
-		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,
-						["parent_server:stopped_nodes  : ",Reason,?MODULE,?LINE]]),
-		   {error,Reason}
-	       end,
-			   
+    {ok,StoppedParents}=parent_server:stopped_nodes(),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: StoppedParents : ",StoppedParents,node(),?MODULE,?LINE]]),    
+
+    CreateResult=[{parent_server:create_node(Parent),Parent}||Parent<-StoppedParents],
+    [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Creating parent node :", Reason,ParentNode,?MODULE,?LINE]])||
+	{{error,Reason},ParentNode}<-CreateResult],
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Creating parent node CreateResult :",CreateResult,?MODULE,?LINE]]),
+%    [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Creating parent node :",ParentNode,?MODULE,?LINE]])||
+%	{ok,ParentNode}<-CreateResult],
+    {ok,ActiveParents}=parent_server:active_nodes(),
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: ActiveParents : ",ActiveParents,node(),?MODULE,?LINE]]),
+    _R1=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
+								   Pod2<-ActiveParents,
+								   Pod1/=Pod2],	
   %  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: StoppedParents : ",StoppedParents,node(),?MODULE,?LINE]]),
   %  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: ActiveParents : ",ActiveParents,node(),?MODULE,?LINE]]),
-		       
-    Result.
+					
+    StoppedParents.
 
 %%--------------------------------------------------------------------
 %% @doc
