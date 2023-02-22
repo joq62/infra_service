@@ -135,29 +135,33 @@ start_parents()->
 %%--------------------------------------------------------------------
 start_pods()->
   %   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: function start : ",node(),?MODULE,?LINE]]),
-    {ok,Stopped}=pod_server:stopped_nodes(),
-    CreateResult=[{pod_server:create_node(Pod),Pod}||Pod<-Stopped],
-    [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Creating pod node :", Reason,Pod,?MODULE,?LINE]])||
-	{{error,Reason},Pod}<-CreateResult],
-
-    [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Creating pod node :",Pod,?MODULE,?LINE]])||
-	{ok,Pod}<-CreateResult],
-    
-    CommonStart=[{appl_server:create_appl("common",PodNode),PodNode}||{ok,PodNode}<-CreateResult],
-  %  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: CommonStart : ",CommonStart,node(),?MODULE,?LINE]]),
-    
-    SdStart=[{appl_server:create_appl("sd",PodNode),PodNode}||{ok,PodNode}<-CreateResult],
-  %  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: SdStart : ",SdStart,node(),?MODULE,?LINE]]),
-
-    {ok,Active}=pod_server:active_nodes(),
-    _R1=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-Active,
-								   Pod2<-Active,
-								   Pod1/=Pod2],	
-
-    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG Creating pod node CreateResult :",CreateResult,?MODULE,?LINE]]),
-  %  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: Stopped : ",Stopped,node(),?MODULE,?LINE]]),
-  %  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: Active: ",Active,node(),?MODULE,?LINE]]),
-    Stopped.
+    Result=case rpc:call(node(),pod_server,stopped_nodes,[],25*1000) of
+	       {ok,Stopped}->
+		   CreateResult=[{rpc:call(node(),pod_server,create_node,[Pod],25*1000),Pod}||Pod<-Stopped],
+		   [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Creating pod node :", CreateRes,Pod,?MODULE,?LINE]])||
+		       {CreateRes,Pod}<-CreateResult,
+		       {ok,Pod}/=CreateRes],
+		   [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Creating pod node :",Pod,?MODULE,?LINE]])||
+		       {ok,Pod}<-CreateResult],
+		   CommonStart=[{rpc:call(node(),appl_server,create_appl,["common",Pod],25*1000),Pod}||{ok,Pod}<-CreateResult],
+		   SdStart=[{rpc:call(node(),appl_server,create_appl,["sd",Pod],25*1000),Pod}||{ok,Pod}<-CreateResult],
+		   case rpc:call(node(),pod_server,active_nodes,[],15*1000) of
+		       {ok,Active}->
+			   _R1=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-Active,
+											      Pod2<-Active,
+											      Pod1/=Pod2],
+			   {ok,Active,Stopped};
+		       Reason->
+			   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,
+							["parent_server:active_nodes  : ",Reason,?MODULE,?LINE]]),
+			   {error,Reason}
+		   end;
+	       Reason->
+		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,
+						["parent_server:stopped_nodes  : ",Reason,?MODULE,?LINE]]),
+		   {error,Reason}
+	   end,
+    Result.
 
 
 %%--------------------------------------------------------------------
