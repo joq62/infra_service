@@ -14,7 +14,8 @@
 -define(SleepInterval,60*1000).
 %% API
 -export([
-	 start_local/1
+	 start_local/1,
+	 start_initial/1
 
 	]).
 
