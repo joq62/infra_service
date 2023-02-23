@@ -135,36 +135,6 @@ handle_cast({orchistrate_result,
 	     _ResultStartPods,
 	     _ResultStartInfraAppls,
 	     _ResultStartUserAppls}, State) ->
-    case parent_server:stopped_nodes() of
-	{error,Reason2}->
-	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error StoppedParents  : ",Reason2,?MODULE,?LINE]]);
-	{ok,[]}->
-	    ok;
-	   % sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Parent running : ",?MODULE,?LINE]]);
-	{ok,StoppedParents}->
-	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error StoppedParents  : ",StoppedParents,?MODULE,?LINE]])
-    end,
-
-    case pod_server:stopped_nodes() of
-	{error,Reason1}->
-	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error StoppedPods  : ",Reason1,?MODULE,?LINE]]);
-	{ok,[]}->
-	    ok;
-	    % sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Pods running  : ",?MODULE,?LINE]]);
-	{ok,StoppedPods}->
-	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error StoppedPods  : ",StoppedPods,?MODULE,?LINE]])
-    end,
-
-    case appl_server:stopped_appls() of
-	{error,Reason3}->
-	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error StoppedApplInfoLists  : ",Reason3,?MODULE,?LINE]]);
-	{ok,[]}->
-	    ok;
-	   % sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK appls  : ",?MODULE,?LINE]]);
-	{ok,StoppedApplInfoLists}->
-	    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error StoppedApplInfoLists  : ",StoppedApplInfoLists,?MODULE,?LINE]])
-    end,
-    
     rpc:cast(node(),lib_infra_service,orchistrate,[State#state.cluster_spec]),
     {noreply, State};
 
