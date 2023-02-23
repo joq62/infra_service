@@ -30,7 +30,7 @@
 start_local(ClusterSpec)->
     ok=start_local_appls(ClusterSpec),
     ok=initiate_local_dbase(ClusterSpec),
-    ok=lib_infra_service:ensure_right_cookie(ClusterSpec),
+    true=lib_infra_service:ensure_right_cookie(ClusterSpec),
 
     ok.
 %%--------------------------------------------------------------------
