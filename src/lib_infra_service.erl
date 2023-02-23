@@ -105,14 +105,14 @@ start_parents()->
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: function start : ",node(),?MODULE,?LINE]]),
     Result=case rpc:call(node(),parent_server,stopped_nodes,[],10*1000) of
 	       {ok,StoppedParents}->
-		   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: StoppedParents : ",StoppedParents,node(),?MODULE,?LINE]]),    
-		   CreateResult=[{rpc:call(node(),parent_server,create_node,[Parent],25*1000),Parent}||Parent<-StoppedParents],
-		   [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Creating parent node :", CreateRes,ParentNode,?MODULE,?LINE]])||
-		       {CreateRes,ParentNode}<-CreateResult,
-		       {ok,ParentNode}/=CreateRes],
+	%	   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: StoppedParents : ",StoppedParents,node(),?MODULE,?LINE]]),    
+		   _CreateResult=[{rpc:call(node(),parent_server,create_node,[Parent],25*1000),Parent}||Parent<-StoppedParents],
+	%	   [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Creating parent node :", CreateRes,ParentNode,?MODULE,?LINE]])||
+	%	       {CreateRes,ParentNode}<-CreateResult,
+	%	       {ok,ParentNode}/=CreateRes],
 		   case rpc:call(node(),parent_server,active_nodes,[],20*1000) of
 		       {ok,ActiveParents}->
-			   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: ActiveParents : ",ActiveParents,node(),?MODULE,?LINE]]),
+	%		   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: ActiveParents : ",ActiveParents,node(),?MODULE,?LINE]]),
 			   _R1=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
 											      Pod2<-ActiveParents,
 											      Pod1/=Pod2];
@@ -142,11 +142,11 @@ start_pods()->
     Result=case rpc:call(node(),pod_server,stopped_nodes,[],25*1000) of
 	       {ok,Stopped}->
 		   CreateResult=[{rpc:call(node(),pod_server,create_node,[Pod],25*1000),Pod}||Pod<-Stopped],
-		   [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Creating pod node :", CreateRes,Pod,?MODULE,?LINE]])||
-		       {CreateRes,Pod}<-CreateResult,
-		       {ok,Pod}/=CreateRes],
-		   [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Creating pod node :",Pod,?MODULE,?LINE]])||
-		       {ok,Pod}<-CreateResult],
+	%	   [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Creating pod node :", CreateRes,Pod,?MODULE,?LINE]])||
+	%	       {CreateRes,Pod}<-CreateResult,
+	%	       {ok,Pod}/=CreateRes],
+	%	   [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["OK Creating pod node :",Pod,?MODULE,?LINE]])||
+	%	       {ok,Pod}<-CreateResult],
 		   _CommonStart=[{rpc:call(node(),appl_server,create_appl,["common",Pod],25*1000),Pod}||{ok,Pod}<-CreateResult],
 		   _SdStart=[{rpc:call(node(),appl_server,create_appl,["sd",Pod],25*1000),Pod}||{ok,Pod}<-CreateResult],
 		   case rpc:call(node(),pod_server,active_nodes,[],15*1000) of
@@ -176,7 +176,7 @@ start_pods()->
 start_infra_appls(ClusterSpec)->   
    Result=case rpc:call(node(),appl_server,stopped_appls,[],30*1000) of
 	      {ok,StoppedApplInfoLists}->
-		  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: StoppedApplInfoLists : ",time(),StoppedApplInfoLists,?MODULE,?LINE]]),
+	%	  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: StoppedApplInfoLists : ",time(),StoppedApplInfoLists,?MODULE,?LINE]]),
 		  R_Nodelog=[{create_infra_appl({PodNode,ApplSpec,App},ClusterSpec),ApplSpec,PodNode}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
 												       nodelog==App],
 		  [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultCreate nodelog :",ResultCreate,?MODULE,?LINE]])||
