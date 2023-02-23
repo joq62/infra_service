@@ -7,7 +7,7 @@
               {env,[]},
               {modules,[appl,appl_server,infra_service,infra_service_app,
                         infra_service_server,infra_service_sup,lib_appl,
-                        lib_infra_service,lib_parent,lib_pod,ops_ssh,
+                        lib_infra_service,lib_parent,lib_pod,local,ops_ssh,
                         parent_server,pod_server]},
               {licenses,["Apache-2.0"]},
               {links,[]}]}.

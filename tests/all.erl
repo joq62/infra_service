@@ -106,7 +106,7 @@ start([ClusterSpec,HostSpec])->
     ok=lib_infra_service:create_infra_appl({InfraPod,"infra_service",infra_service},ClusterSpec),
     true=rpc:cast(InfraPod,infra_service,start_orchistrate,[]),
     
-
+    application:stop(infra_service),
     
     io:format("Phase 3 Running nodes !!! ~p~n",[{running_nodes(NodelogPod),?MODULE,?FUNCTION_NAME}]),
     io:format("Phase 3 Running apps !!! ~p~n",[{running_apps(NodelogPod),?MODULE,?FUNCTION_NAME}]),
