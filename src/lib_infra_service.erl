@@ -322,6 +322,8 @@ create_infra_appl({PodNode,ApplSpec,infra_service},ClusterSpec) ->
 %%--------------------------------------------------------------------
 start_user_appls()->
     Result=case rpc:call(node(),appl_server,stopped_appls,[],5*1000) of
+	       {ok,[]}->
+		   ok;
 	       {ok,StoppedApplInfoLists}->			  
 		   StoppedUserApplications=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
 								    common/=App,

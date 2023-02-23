@@ -75,11 +75,11 @@ start([ClusterSpec,HostSpec])->
     WhichApplications2=[{Node,rpc:call(Node,application,which_applications,[],5000)}||Node<-nodes()],
     io:format("WhichApplications2 !!! ~p~n",[{WhichApplications2,?MODULE,?FUNCTION_NAME,?LINE}]),
     
-    loop(),
+%    loop(),
     
-%    io:format("Stop OK !!! ~p~n",[{?MODULE,?FUNCTION_NAME}]),
- %   timer:sleep(2000),
- %  init:stop(),
+    io:format("Stop OK !!! ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+    timer:sleep(2000),
+   init:stop(),
     ok.
 
 
