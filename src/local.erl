@@ -52,9 +52,7 @@ start_initial(ClusterSpec)->
     ok=lib_infra_service:create_infra_appl({DbPod,"db_etcd",db_etcd},ClusterSpec),
     application:stop(db_etcd),
         
-    ok=parent_server:load_desired_state(ClusterSpec),
-    ok=pod_server:load_desired_state(ClusterSpec),
-    ok=appl_server:load_desired_state(ClusterSpec),
+   
 
     [{ok,InfraPod,InfraApplSpec}]=lib_infra_service:create_pods_based_appl("infra_service"),
     [{ok,_,_,_}]=lib_infra_service:create_appl([{InfraPod,"common",common}]),
@@ -83,6 +81,9 @@ start_local_appls(ClusterSpec)->
     pong=parent_server:ping(),
     pong=pod_server:ping(),
     pong=appl_server:ping(),
+    ok=parent_server:load_desired_state(ClusterSpec),
+    ok=pod_server:load_desired_state(ClusterSpec),
+    ok=appl_server:load_desired_state(ClusterSpec),
 
     ok.
 
