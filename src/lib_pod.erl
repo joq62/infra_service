@@ -74,7 +74,7 @@ active_nodes()->
 %% @end
 %%--------------------------------------------------------------------
 stopped_nodes()->
-    AllNodes=sd:call(db_etcd,db_parent_desired_state,get_all_id,[],5000),
+    AllNodes=sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000),
     Result=case active_nodes() of
 	       {ok,ActiveNodes}->		 
 		   StoppedNodes=[Node||Node<-AllNodes,
