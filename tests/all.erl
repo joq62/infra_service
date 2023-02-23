@@ -128,6 +128,9 @@ start([ClusterSpec,HostSpec])->
 %% @end
 %%--------------------------------------------------------------------
 loop()->
+    io:format(" ~n"),
+    io:format("************************************************** ~n"),
+    io:format(" ~n"),
     timer:sleep(20*1000),
     R_parent_stopped=sd:call(infra_service,parent_server,stopped_nodes,[],10000),
     R_pod_stopped=sd:call(infra_service,pod_server,stopped_nodes,[],10000),
