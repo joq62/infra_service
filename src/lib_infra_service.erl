@@ -104,6 +104,8 @@ orchistrate(ClusterSpec,SleepInterval)->
 start_parents()->
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: function start : ",node(),?MODULE,?LINE]]),
     Result=case rpc:call(node(),parent_server,stopped_nodes,[],10*1000) of
+	       {ok,[]}->
+		   ok;
 	       {ok,StoppedParents}->
 	%	   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: StoppedParents : ",StoppedParents,node(),?MODULE,?LINE]]),    
 		   _CreateResult=[{rpc:call(node(),parent_server,create_node,[Parent],25*1000),Parent}||Parent<-StoppedParents],
@@ -140,6 +142,8 @@ start_parents()->
 start_pods()->
   %   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: function start : ",node(),?MODULE,?LINE]]),
     Result=case rpc:call(node(),pod_server,stopped_nodes,[],25*1000) of
+	       {ok,[]}->
+		   ok;
 	       {ok,Stopped}->
 		   CreateResult=[{rpc:call(node(),pod_server,create_node,[Pod],25*1000),Pod}||Pod<-Stopped],
 	%	   [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Creating pod node :", CreateRes,Pod,?MODULE,?LINE]])||
@@ -175,6 +179,8 @@ start_pods()->
 %%--------------------------------------------------------------------
 start_infra_appls(ClusterSpec)->   
    Result=case rpc:call(node(),appl_server,stopped_appls,[],30*1000) of
+	      {ok,[]}->
+		  ok;
 	      {ok,StoppedApplInfoLists}->
 	%	  sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: StoppedApplInfoLists : ",time(),StoppedApplInfoLists,?MODULE,?LINE]]),
 		  R_Nodelog=[{create_infra_appl({PodNode,ApplSpec,App},ClusterSpec),ApplSpec,PodNode}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
