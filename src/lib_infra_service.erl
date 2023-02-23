@@ -80,7 +80,10 @@ orchistrate(ClusterSpec,SleepInterval)->
 
     ResultStartInfraAppls=rpc:call(node(),?MODULE,start_infra_appls,[ClusterSpec],60*1000),
     sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultStartInfraAppls  : ",ResultStartInfraAppls,?MODULE,?LINE]]),
+    
     ResultStartUserAppls=rpc:call(node(),?MODULE,start_user_appls,[],60*1000), 
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["ResultStartUserAppls  : ",ResultStartUserAppls,?MODULE,?LINE]]),
+
 
     rpc:cast(node(),infra_service,orchistrate_result,[ResultStartParents,
 						      ResultStartPods,
@@ -92,6 +95,7 @@ orchistrate(ClusterSpec,SleepInterval)->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
@@ -320,9 +324,10 @@ start_user_appls()->
 								    nodelog/=App,
 								    infra_service/=App],
 		   ApplCreateResult=create_appl(StoppedUserApplications,[]),
-		   [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Create Result :", CreateResult,?MODULE,?LINE]])||
+		   [sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Create start_user_appls Result :", CreateResult,?MODULE,?LINE]])||
 		       CreateResult<-ApplCreateResult];
 	       Reason->
+		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Create start_user_appls Result :", Reason,?MODULE,?LINE]]),
 		   {error,["appl_server,stopped_appls ",Reason,?MODULE,?LINE]}
 	   end,
     Result.
