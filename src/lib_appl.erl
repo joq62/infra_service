@@ -36,7 +36,6 @@
 %% @end
 %%--------------------------------------------------------------------
 desired_appls()->
-    
     Result=case sd:call(db_etcd,db_appl_desired_state,get_all_id,[],5000) of
 	       {error,Reason}->
 		   {error,Reason};
@@ -49,35 +48,54 @@ desired_appls()->
 
 %%--------------------------------------------------------------------
 %% @doc
-
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
 active_appls()->
-  
-    A1=[{PodNode,sd:call(db_etcd,db_pod_desired_state,read,[appl_spec_list,PodNode],5000)}||PodNode<-sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000)],
-    A2=[{PodNode,ApplList}||{PodNode,{ok,ApplList}}<-A1],
-    PodApplSpecAppList=lists:append([pod_app_list(PodApplSpecList,[])||PodApplSpecList<-A2]),
-    {ok,StoppedAppls}=stopped_appls(),
-    ActiveAppls=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-PodApplSpecAppList,
-					false==lists:member({PodNode,ApplSpec,App},StoppedAppls)],
-    {ok,ActiveAppls}.
-    %%--------------------------------------------------------------------
+    Result=case sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000) of
+	       {error,Reason}->
+		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: db_pod_desired_state,get_all_id: ",Reason,?MODULE,?LINE]]),
+		   {error,Reason};
+	       AllNodes->
+		   A1=[{PodNode,sd:call(db_etcd,db_pod_desired_state,read,[appl_spec_list,PodNode],5000)}||PodNode<-AllNodes],
+		   A2=[{PodNode,ApplList}||{PodNode,{ok,ApplList}}<-A1],
+		   PodApplSpecAppList=lists:append([pod_app_list(PodApplSpecList,[])||PodApplSpecList<-A2]),
+		   case stopped_appls() of
+		       {error,Reason}->
+			   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: stopped_appls() : ",Reason,?MODULE,?LINE]]),
+			   {error,Reason};
+		       {ok,StoppedAppls}->
+			   ActiveAppls=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-PodApplSpecAppList,
+								false==lists:member({PodNode,ApplSpec,App},StoppedAppls)],
+			   {ok,ActiveAppls}
+		   end
+	   end,
+    Result.
+    
+%%--------------------------------------------------------------------
 %% @doc
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
 stopped_appls()->
-    A1=[{PodNode,sd:call(db_etcd,db_pod_desired_state,read,[appl_spec_list,PodNode],5000)}||PodNode<-sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000)],
-%    io:format("A1 ~p~n",[{A1,?MODULE,?FUNCTION_NAME,?LINE}]),
-    A2=[{PodNode,ApplList}||{PodNode,{ok,ApplList}}<-A1],
-    PodApplSpecAppList=lists:append([pod_app_list(PodApplSpecList,[])||PodApplSpecList<-A2]),
-    
-    StoppedAppls=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-PodApplSpecAppList,
+    Result=case sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000) of
+	       {error,Reason}->
+		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: db_pod_desired_state,get_all_id: ",Reason,?MODULE,?LINE]]),
+		   {error,Reason};
+	       AllNodes->
+		   A1=[{PodNode,sd:call(db_etcd,db_pod_desired_state,read,[appl_spec_list,PodNode],5000)}||PodNode<-AllNodes],
+		   A2=[{PodNode,ApplList}||{PodNode,{ok,ApplList}}<-A1],
+		   PodApplSpecAppList=lists:append([pod_app_list(PodApplSpecList,[])||PodApplSpecList<-A2]),
+		   StoppedAppls=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-PodApplSpecAppList,
 					  false==is_app_running(App,PodNode)],
-    {ok,StoppedAppls}.
-    
-
+		   {ok,StoppedAppls}
+	   end,
+    Result.
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
 is_app_running(App,PodNode)->
     Result=case rpc:call(PodNode,application,which_applications,[],5000) of
 	       {badrpc,_}->
@@ -86,15 +104,20 @@ is_app_running(App,PodNode)->
 		   lists:keymember(App,1,Applications)
 	   end,
     Result.
-
-
-    
-    
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
 pod_app_list({_PodNode,[]},Acc)->
     Acc;
 pod_app_list({PodNode,[ApplSpec|T]},Acc)->
-   {ok,App}=sd:call(db_etcd,db_appl_spec,read,[app,ApplSpec],5000),
-    NewAcc=[{PodNode,ApplSpec,App}|Acc],
+   case sd:call(db_etcd,db_appl_spec,read,[app,ApplSpec],5000) of
+       {ok,App}->
+	   NewAcc=[{PodNode,ApplSpec,App}|Acc];
+       Reason->
+	   NewAcc=[{error,[Reason,PodNode,ApplSpec]}|Acc]
+   end,
     pod_app_list({PodNode,T},NewAcc).
 %%--------------------------------------------------------------------
 %% @doc

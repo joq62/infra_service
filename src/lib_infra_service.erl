@@ -102,7 +102,6 @@ orchistrate(ClusterSpec,SleepInterval)->
 %% @end
 %%--------------------------------------------------------------------
 start_parents()->
-    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: function start : ",node(),?MODULE,?LINE]]),
     Result=case rpc:call(node(),parent_server,stopped_nodes,[],10*1000) of
 	       {ok,[]}->
 		   ok;
@@ -321,7 +320,7 @@ create_infra_appl({PodNode,ApplSpec,infra_service},ClusterSpec) ->
 %% @end
 %%--------------------------------------------------------------------
 start_user_appls()->
-    Result=case rpc:call(node(),appl_server,stopped_appls,[],5*1000) of
+    Result=case rpc:call(node(),appl_server,stopped_appls,[],15*1000) of
 	       {ok,[]}->
 		   ok;
 	       {ok,StoppedApplInfoLists}->			  

@@ -53,25 +53,38 @@ desired_nodes()->
 %% @end
 %%--------------------------------------------------------------------
 active_nodes()->
-    AllNodes= sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000),
-    RunningNodesDir=[{Node,sd:call(db_etcd,db_pod_desired_state,read,[pod_dir,Node],5000)}||Node<-AllNodes,
-								pong==net_adm:ping(Node)],
-    ActiveNodes=[Node||{Node,{ok,PodDir}}<-RunningNodesDir,
-		       rpc:call(Node,filelib,is_dir,[PodDir],5000)],
-    [rpc:call(Node,init,stop,[],3000)||{Node,{ok,_PodDir}}<-RunningNodesDir,
-				       false==lists:member(Node,ActiveNodes)],
-    {ok,ActiveNodes}.
-    %%--------------------------------------------------------------------
+    Result= case sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000) of
+		  {error,Reason}->
+		    sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: db_pod_desired_state,get_all_id: ",Reason,?MODULE,?LINE]]),
+		    {error,Reason};
+		AllNodes->
+		    RunningNodesDir=[{Node,sd:call(db_etcd,db_pod_desired_state,read,[pod_dir,Node],5000)}||Node<-AllNodes,
+													    pong==net_adm:ping(Node)],
+		    ActiveNodes=[Node||{Node,{ok,PodDir}}<-RunningNodesDir,
+				       rpc:call(Node,filelib,is_dir,[PodDir],5000)],
+		    [rpc:call(Node,init,stop,[],3000)||{Node,{ok,_PodDir}}<-RunningNodesDir,
+						       false==lists:member(Node,ActiveNodes)],
+		    {ok,ActiveNodes}
+	    end,
+    Result.
+
+%%--------------------------------------------------------------------
 %% @doc
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
 stopped_nodes()->
-    AllNodes=sd:call(db_etcd,db_pod_desired_state,get_all_id,[],5000),
-    {ok,ActiveNodes}=active_nodes(),
-    StoppedNodes=[Node||Node<-AllNodes,
-			false==lists:member(Node,ActiveNodes)],
-    {ok,StoppedNodes}.
+    AllNodes=sd:call(db_etcd,db_parent_desired_state,get_all_id,[],5000),
+    Result=case active_nodes() of
+	       {ok,ActiveNodes}->		 
+		   StoppedNodes=[Node||Node<-AllNodes,
+				       false==lists:member(Node,ActiveNodes)],
+		   {ok,StoppedNodes};
+	       Reason->
+		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: active_nodes: ",Reason,?MODULE,?LINE]]),
+		   {error,Reason}
+	   end,
+    Result.
     
     
 %%--------------------------------------------------------------------
@@ -80,13 +93,38 @@ stopped_nodes()->
 %% @end
 %%--------------------------------------------------------------------
 create_node(PodNode)->
-    {ok,ParentNode}=sd:call(db_etcd,db_pod_desired_state,read,[parent_node,PodNode],5000),
-    {ok,NodeName}=sd:call(db_etcd,db_pod_desired_state,read,[node_name,PodNode],5000),
-    {ok,PodDir}=sd:call(db_etcd,db_pod_desired_state,read,[pod_dir,PodNode],5000),
-    {ok,PaArgsList}=sd:call(db_etcd,db_pod_desired_state,read,[pa_args_list,PodNode],5000),
-    {ok,EnvArgs}=sd:call(db_etcd,db_pod_desired_state,read,[env_args,PodNode],5000),
-    create_node(ParentNode,NodeName,PodDir,PaArgsList,EnvArgs).
-
+    Result=case sd:call(db_etcd,db_pod_desired_state,read,[parent_node,PodNode],5000) of
+	{ok,ParentNode}->
+		   case sd:call(db_etcd,db_pod_desired_state,read,[node_name,PodNode],5000) of
+		       {ok,NodeName}->
+			   case sd:call(db_etcd,db_pod_desired_state,read,[pod_dir,PodNode],5000) of
+			       {ok,PodDir}->
+				   case sd:call(db_etcd,db_pod_desired_state,read,[pa_args_list,PodNode],5000) of
+				       {ok,PaArgsList}->
+					   case sd:call(db_etcd,db_pod_desired_state,read,[env_args,PodNode],5000) of 
+					       {ok,EnvArgs}->
+						   create_node(ParentNode,NodeName,PodDir,PaArgsList,EnvArgs);
+					       Reason->
+						   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: db_pod_desired_state,read,[env_args,PodNode ",Reason,PodNode,?MODULE,?LINE]]),
+						   {error,Reason}
+					   end;
+				       Reason->
+					   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: db_pod_desired_state,read,[pa_args_list,PodNode ",Reason,PodNode,?MODULE,?LINE]]),
+					   {error,Reason}
+				   end;
+			       Reason->
+				   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: db_pod_desired_state,read,[pod_dir,PodNode ",Reason,PodNode,?MODULE,?LINE]]),
+				   {error,Reason}
+			   end;
+		       Reason->
+			   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: db_pod_desired_state,read,[node_name,PodNode ",Reason,PodNode,?MODULE,?LINE]]),
+			   {error,Reason}
+		   end;
+	       Reason->
+		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: db_pod_desired_state,read,[parent_node,PodNode ",Reason,PodNode,?MODULE,?LINE]]),
+		   {error,Reason}
+	   end,
+    Result.
 
 create_node(ParentNode,NodeName,PodDir,PaArgsList,EnvArgs)->
     Result=case rpc:call(ParentNode,net,gethostname,[],5000) of
