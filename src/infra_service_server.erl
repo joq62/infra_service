@@ -131,10 +131,18 @@ handle_call(Request, From, State) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
 handle_cast({orchistrate_result,
-	     _ResultStartParents,
-	     _ResultStartPods,
-	     _ResultStartInfraAppls,
-	     _ResultStartUserAppls}, State) ->
+	     ResultStartParents,
+	     ResultStartPods,
+	     ResultStartInfraAppls,
+	     ResultStartUserAppls}, State) ->
+
+    sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["Orchistrate_result:",date(),time(),
+							      ResultStartParents,
+							      ResultStartPods,
+							      ResultStartInfraAppls,
+							      ResultStartUserAppls,
+							      ?MODULE,?LINE]]),
+    
     rpc:cast(node(),lib_infra_service,orchistrate,[State#state.cluster_spec]),
     {noreply, State};
 
