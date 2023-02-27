@@ -223,8 +223,10 @@ create_pods_based_appl(ApplSpec)->
 		   io:format("DBG:  Pods ~p~n",[{Pods,?MODULE,?LINE}]), 
 		   AllPodsApplSpecsToStart=[{PodNode,sd:call(db_etcd,db_pod_desired_state,read,[appl_spec_list,PodNode],5*1000)}||PodNode<-Pods,
 																  pang==net_adm:ping(PodNode)],
+		   io:format("DBG:  AllPodsApplSpecsToStart ~p~n",[{AllPodsApplSpecsToStart,?MODULE,?LINE}]), 
 		   PodsToStart=[PodNode||{PodNode,{ok,ApplSpecList}}<-AllPodsApplSpecsToStart,
 					 lists:member(ApplSpec,ApplSpecList)],
+		   io:format("DBG:  PodsToStart ~p~n",[{PodsToStart,?MODULE,?LINE}]), 
 		   [{create_pod(PodNode),PodNode,ApplSpec}||PodNode<-PodsToStart]
 	   end,
     Result.
