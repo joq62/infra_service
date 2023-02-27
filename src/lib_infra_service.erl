@@ -109,7 +109,9 @@ start_parents()->
 	       {ok,StoppedParents}->
 		   io:format("StoppedParents  ~p~n",[{StoppedParents,?MODULE,?LINE}]),
 	%	   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: StoppedParents : ",StoppedParents,node(),?MODULE,?LINE]]),    
-		   _CreateResult=[{rpc:call(node(),parent_server,create_node,[Parent],25*1000),Parent}||Parent<-StoppedParents],
+		   
+		   CreateResult=[{rpc:call(node(),parent_server,create_node,[Parent],25*1000),Parent}||Parent<-StoppedParents],
+		   io:format("CreateResult  ~p~n",[{CreateResult,?MODULE,?LINE}]),
 	%	   [sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error Creating parent node :", CreateRes,ParentNode,?MODULE,?LINE]])||
 	%	       {CreateRes,ParentNode}<-CreateResult,
 	%	       {ok,ParentNode}/=CreateRes],
