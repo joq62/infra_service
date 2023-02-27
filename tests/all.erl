@@ -68,6 +68,11 @@ start([ClusterSpec,HostSpec])->
     ok=setup(ClusterSpec),
     ok=infra_service_test:setup(),
     ok=local:start_local(ClusterSpec),
+ % just for testing 
+    [rpc:call(Pod,init,stop,[],5000)||Pod<-db_parent_desired_state:get_all_id()],
+    timer:sleep(2000),
+    [rpc:call(Pod,init,stop,[],5000)||Pod<-db_pod_desired_state:get_all_id()],
+    timer:sleep(1000),
     io:format("OK: local:start_local ~p~n",[{?MODULE,?LINE}]),
     ok=local:start_initial(ClusterSpec),
     io:format("OK: local:start_initial ~p~n",[{?MODULE,?LINE}]),

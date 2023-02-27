@@ -105,7 +105,7 @@ orchistrate(ClusterSpec,SleepInterval)->
 start_parents()->
     Result=case rpc:call(node(),parent_server,stopped_nodes,[],10*1000) of
 	       {ok,[]}->
-		   ok;
+		   {ok,[]};
 	       {ok,StoppedParents}->
 	%	   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: StoppedParents : ",StoppedParents,node(),?MODULE,?LINE]]),    
 		   _CreateResult=[{rpc:call(node(),parent_server,create_node,[Parent],25*1000),Parent}||Parent<-StoppedParents],
