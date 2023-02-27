@@ -124,11 +124,12 @@ create_node(ParentNode)->
 					   TimeOut=10*1000,
 					   case rpc:call(node(),ops_ssh,create,[HostSpec,NodeName,Cookie,PaArgs,EnvArgs,TimeOut],TimeOut+1000) of
 					       {ok,ParentNode}->
+						   io:format("ParentNode  ~p~n",[{ParentNode,?MODULE,?LINE}]),
 						   case rpc:call(ParentNode,filelib,is_dir,[ClusterSpec],10*1000) of
 						       true->
 							   case rpc:call(ParentNode,file,del_dir_r,[ClusterSpec],10*1000) of
 							       ok->
-								   case rpc:call(ParentNode,make_dir,[ClusterSpec],10*1000) of
+								   case rpc:call(ParentNode,file,make_dir,[ClusterSpec],10*1000) of
 								       ok->
 									   ok;
 								       Reason->
@@ -140,7 +141,7 @@ create_node(ParentNode)->
 								   {error,Reason}
 							   end;  
 						       false->
-							   case rpc:call(ParentNode,make_dir,[ClusterSpec],10*1000) of
+							   case rpc:call(ParentNode,file,make_dir,[ClusterSpec],10*1000) of
 							       ok->
 								   ok;
 							       Reason->
