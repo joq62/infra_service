@@ -59,10 +59,14 @@ active_nodes()->
 		       {ok,ClusterSpec}->
 			   case sd:call(db_etcd,db_cluster_spec,read,[root_dir,ClusterSpec],5000) of
 			       {ok,RootDir}->
+				   io:format("RootDir  ~p~n",[{RootDir,?MODULE,?LINE}]),
 				   RunningNodes=[Node||Node<-AllNodes,
 						       pong==net_adm:ping(Node)],
+				   io:format("RunningNodes  ~p~n",[{RunningNodes,?MODULE,?LINE}]),
+				   io:format("RootDirs  ~p~n",[{[{rpc:call(Node,filelib,is_dir,[RootDir],5000),Node}||Node<-RunningNodes],?MODULE,?LINE}]),
 				   ActiveNodes=[Node||Node<-RunningNodes,
 						      rpc:call(Node,filelib,is_dir,[RootDir],5000)],
+				   io:format("ActiveNodes  ~p~n",[{ActiveNodes,?MODULE,?LINE}]),
 				   [rpc:call(Node,init,stop,[],3000)||Node<-RunningNodes,
 								      false==lists:member(Node,ActiveNodes)],
 				   {ok,ActiveNodes};
@@ -119,12 +123,38 @@ create_node(ParentNode)->
 					   PaArgs=" ",
 					   TimeOut=10*1000,
 					   case rpc:call(node(),ops_ssh,create,[HostSpec,NodeName,Cookie,PaArgs,EnvArgs,TimeOut],TimeOut+1000) of
-						      {ok,ParentNode}->
-							  ok;
-						      Reason->
-							  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: ops_ssh:create : ",Reason,?MODULE,?LINE]]),
-							  {error,Reason}
-					   end;
+					       {ok,ParentNode}->
+						   case rpc:call(ParentNode,filelib,is_dir,[ClusterSpec],10*1000) of
+						       true->
+							   case rpc:call(ParentNode,file,del_dir_r,[ClusterSpec],10*1000) of
+							       ok->
+								   case rpc:call(ParentNode,make_dir,[ClusterSpec],10*1000) of
+								       ok->
+									   ok;
+								       Reason->
+									   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: make dir : ",Reason,ClusterSpec,ParentNode,?MODULE,?LINE]]),
+									   {error,Reason}
+								   end;
+							       Reason->
+								   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: del dir : ",Reason,ClusterSpec,ParentNode,?MODULE,?LINE]]),
+								   {error,Reason}
+							   end;  
+						       false->
+							   case rpc:call(ParentNode,make_dir,[ClusterSpec],10*1000) of
+							       ok->
+								   ok;
+							       Reason->
+								   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: make dir : ",Reason,ClusterSpec,ParentNode,?MODULE,?LINE]]),
+								   {error,Reason}
+							   end;
+						       Reason->
+							   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: is_dir : ",Reason,ClusterSpec,ParentNode,?MODULE,?LINE]]),
+							   {error,Reason}
+						   end;   
+					       Reason->
+						   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: ops_ssh,create : ",Reason,ParentNode,HostSpec,NodeName,Cookie,PaArgs,EnvArgs,TimeOut,?MODULE,?LINE]]),
+						   {error,Reason}
+					   end;   
 				       Reason->
 					   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Error: db_cluster_spec,read, cookie: ",Reason,ParentNode,?MODULE,?LINE]]),
 					   {error,Reason}
