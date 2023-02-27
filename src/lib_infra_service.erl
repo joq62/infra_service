@@ -115,9 +115,11 @@ start_parents()->
 		   case rpc:call(node(),parent_server,active_nodes,[],20*1000) of
 		       {ok,ActiveParents}->
 	%		   sd:cast(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["DBG: ActiveParents : ",ActiveParents,node(),?MODULE,?LINE]]),
-			   _R1=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
+			   R1=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
 											      Pod2<-ActiveParents,
-											      Pod1/=Pod2];
+											      Pod1/=Pod2],
+			   {ok,ActiveParents};
+		       
 		       Reason->
 			   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,
 							["parent_server:active_nodes  : ",Reason,?MODULE,?LINE]]),
