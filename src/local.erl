@@ -39,7 +39,7 @@ start_local(ClusterSpec)->
 %% @end
 %%-------------------------------------------------------------------
 start_initial(ClusterSpec)->
-    {ok,ActiveParents}=infra_service_test:start_parents(),
+    {ok,ActiveParents}=lib_infra_service:start_parents(),
      
     [{ok,NodelogPod,NodelogApplSpec}]=lib_infra_service:create_pods_based_appl("nodelog"),
     [{ok,_,_,_}]=lib_infra_service:create_appl([{NodelogPod,"common",common}]),
