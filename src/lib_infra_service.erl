@@ -220,6 +220,7 @@ create_pods_based_appl(ApplSpec)->
 		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["db_pod_desired_state,get_all_id : ",no_pods]]),
 		   {error,[no_pods,?MODULE,?LINE]};
 	       Pods->
+		   io:format("DBG:  Pods ~p~n",[{Pods,?MODULE,?LINE}]), 
 		   AllPodsApplSpecsToStart=[{PodNode,sd:call(db_etcd,db_pod_desired_state,read,[appl_spec_list,PodNode],5*1000)}||PodNode<-Pods,
 																  pang==net_adm:ping(PodNode)],
 		   PodsToStart=[PodNode||{PodNode,{ok,ApplSpecList}}<-AllPodsApplSpecsToStart,
