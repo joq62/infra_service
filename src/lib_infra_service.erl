@@ -212,13 +212,21 @@ start_infra_appls(ClusterSpec)->
 %% @end
 %%--------------------------------------------------------------------
 create_pods_based_appl(ApplSpec)->
-    AllPodsApplSpecsToStart=[{PodNode,db_pod_desired_state:read(appl_spec_list,PodNode)}||PodNode<-db_pod_desired_state:get_all_id(),
-											  pang==net_adm:ping(PodNode)],
-    PodsToStart=[PodNode||{PodNode,{ok,ApplSpecList}}<-AllPodsApplSpecsToStart,
-			  lists:member(ApplSpec,ApplSpecList)],
- %   io:format("PodsToStart, ApplSpec ~p~n",[{PodsToStart,ApplSpec,?MODULE,?FUNCTION_NAME,?LINE}]),
-    [{create_pod(PodNode),PodNode,ApplSpec}||PodNode<-PodsToStart].
-
+    Result=case sd:call(db_etcd,db_pod_desired_state,get_all_id,[],10*1000) of
+	       {badrpc,Reason}->
+		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["db_pod_desired_state,get_all_id : ",badrpc,Reason]]),
+		   {error,[badrpc,Reason,?MODULE,?LINE]};
+	       []->
+		   sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["db_pod_desired_state,get_all_id : ",no_pods]]),
+		   {error,[no_pods,?MODULE,?LINE]};
+	       Pods->
+		   AllPodsApplSpecsToStart=[{PodNode,sd:call(db_etcd,db_pod_desired_state,read,[appl_spec_list,PodNode],5*1000)}||PodNode<-Pods,
+																  pang==net_adm:ping(PodNode)],
+		   PodsToStart=[PodNode||{PodNode,{ok,ApplSpecList}}<-AllPodsApplSpecsToStart,
+					 lists:member(ApplSpec,ApplSpecList)],
+		   [{create_pod(PodNode),PodNode,ApplSpec}||PodNode<-PodsToStart]
+	   end,
+    Result.
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
